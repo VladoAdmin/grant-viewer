@@ -84,8 +84,8 @@ export function DetailModal({ callId, onClose }: Props) {
                 <span>{call.eligible_applicants || '—'}</span>
               </div>
               <div className="detail-field">
-                <label>Stav</label>
-                <span className={`status-badge ${(call.status || '').toLowerCase().includes('vyhlásen') ? 'open' : ''}`}>
+                <label>Typ výzvy</label>
+                <span className={`status-badge ${(call.status || '').toLowerCase().includes('otvoren') ? 'open' : ''}`}>
                   {call.status || '—'}
                 </span>
               </div>
