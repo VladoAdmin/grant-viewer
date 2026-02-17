@@ -79,8 +79,9 @@ export function GanttView({ calls, onSelect }: Props) {
       orientation: 'top' as const,
       margin: { item: 2 },
       tooltip: { followMouse: true },
-      horizontalScroll: true,
-      zoomKey: 'ctrlKey' as const,
+      horizontalScroll: false,
+      zoomable: true,
+      moveable: true,
     };
 
     if (timelineRef.current) {
@@ -119,7 +120,7 @@ export function GanttView({ calls, onSelect }: Props) {
 
       <div className="gantt-info">
         <span>📊 {ganttCalls.length} výziev s dátumom vyhlásenia</span>
-        <span className="gantt-hint">Ctrl + kolečko myši = zoom | Ťahanie = posúvanie</span>
+        <span className="gantt-hint">Kolečko myši = zoom | Ťahanie = posúvanie</span>
       </div>
       <div className="gantt-legend">
         {Object.entries(sourceColors).map(([src, color]) => (

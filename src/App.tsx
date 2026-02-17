@@ -24,7 +24,7 @@ function App() {
         <div className="brand">
           <img
             className="brand-logo"
-            src="/stormlevel-logo.png"
+            src={import.meta.env.BASE_URL + 'stormlevel-logo.png'}
             alt="StormLevel"
           />
           <h1>Prehľad grantových výziev</h1>
