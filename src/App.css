@@ -18,13 +18,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* Header */
 .header {
-  display: flex; align-items: center; gap: 16px;
-  padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-.header h1 { font-size: 18px; white-space: nowrap; }
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.brand-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.header h1 {
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tabs { display: flex; gap: 4px; margin-left: auto; }
 .tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 6px 16px; border: 1px solid var(--border); border-radius: 6px;
   background: transparent; color: var(--text-muted); cursor: pointer; font-size: 14px;
   transition: all 0.2s;
@@ -75,13 +107,22 @@ td { padding: 8px 12px; vertical-align: top; }
 
 /* Gantt View */
 .gantt-view { flex: 1; padding: 16px 24px; }
-.gantt-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+
+.gantt-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.gantt-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; gap: 12px; flex-wrap: wrap; }
 .gantt-hint { color: var(--text-muted); font-size: 12px; }
 .gantt-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .legend-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 
-.timeline-container { height: calc(100vh - 180px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.timeline-container { height: calc(100vh - 240px); min-height: 420px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 
 /* vis-timeline dark overrides */
 .vis-timeline { border: none !important; background: var(--surface) !important; }
@@ -132,3 +173,63 @@ td { padding: 8px 12px; vertical-align: top; }
 .attachments-list a { color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 6px; }
 .attachments-list a:hover { text-decoration: underline; }
 .file-type { background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-size: 10px; color: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 720px) {
+  .header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .brand {
+    width: 100%;
+  }
+
+  .header h1 {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .tabs {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .tabs button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .count {
+    margin-left: auto;
+  }
+
+  .list-view, .gantt-view {
+    padding: 12px 16px;
+  }
+
+  .search-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .attr-row {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .attr-key {
+    min-width: 0;
+  }
+
+  .timeline-container {
+    height: calc(100vh - 320px);
+    min-height: 380px;
+  }
+}

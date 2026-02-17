@@ -21,7 +21,14 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>🇸🇰 Prehľad grantových výziev</h1>
+        <div className="brand">
+          <img
+            className="brand-logo"
+            src="/stormlevel-logo.png"
+            alt="StormLevel"
+          />
+          <h1>Prehľad grantových výziev</h1>
+        </div>
         <nav className="tabs">
           <button
             className={view === 'list' ? 'active' : ''}
