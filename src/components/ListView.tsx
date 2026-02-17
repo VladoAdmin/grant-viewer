@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { GrantCall } from '../lib/supabase';
+import { matchesQuery } from '../lib/search';
 
 interface Props {
   calls: GrantCall[];
@@ -16,8 +17,7 @@ export function ListView({ calls, onSelect }: Props) {
 
   const filtered = useMemo(() => {
     return calls.filter(c => {
-      if (search && !c.title.toLowerCase().includes(search.toLowerCase()) &&
-          !(c.provider || '').toLowerCase().includes(search.toLowerCase())) return false;
+      if (!matchesQuery([c.title, c.source, c.provider], search)) return false;
       if (sourceFilter && c.source !== sourceFilter) return false;
       if (statusFilter && (c.status || 'N/A') !== statusFilter) return false;
       return true;
@@ -39,7 +39,7 @@ export function ListView({ calls, onSelect }: Props) {
       <div className="filters">
         <input
           type="text"
-          placeholder="🔍 Hľadať podľa názvu alebo poskytovateľa..."
+          placeholder="🔍 Hľadať (názov, zdroj, poskytovateľ)..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="search-input"

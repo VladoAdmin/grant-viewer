@@ -1,5 +1,6 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { GrantCall } from '../lib/supabase';
+import { matchesQuery } from '../lib/search';
 import { DataSet } from 'vis-data';
 import { Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.min.css';
@@ -10,13 +11,16 @@ interface Props {
 }
 
 export function GanttView({ calls, onSelect }: Props) {
+  const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<Timeline | null>(null);
 
-  // Only calls with announced_at
+  // Only calls with announced_at + search filter
   const ganttCalls = useMemo(() => {
-    return calls.filter(c => c.announced_at);
-  }, [calls]);
+    return calls
+      .filter(c => c.announced_at)
+      .filter(c => matchesQuery([c.title, c.source, c.provider], search));
+  }, [calls, search]);
 
   // Color by source
   const sourceColors: Record<string, string> = useMemo(() => {
@@ -32,7 +36,15 @@ export function GanttView({ calls, onSelect }: Props) {
   }, [ganttCalls]);
 
   useEffect(() => {
-    if (!containerRef.current || ganttCalls.length === 0) return;
+    if (!containerRef.current) return;
+
+    if (ganttCalls.length === 0) {
+      if (timelineRef.current) {
+        timelineRef.current.destroy();
+        timelineRef.current = null;
+      }
+      return;
+    }
 
     const endOfYear = new Date(new Date().getFullYear(), 11, 31).toISOString().slice(0, 10);
 
@@ -94,6 +106,17 @@ export function GanttView({ calls, onSelect }: Props) {
 
   return (
     <div className="gantt-view">
+      <div className="gantt-controls">
+        <input
+          type="text"
+          placeholder="🔍 Hľadať (názov, zdroj, poskytovateľ)..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="search-input"
+        />
+        <span className="result-count">{ganttCalls.length} z {calls.filter(c => c.announced_at).length}</span>
+      </div>
+
       <div className="gantt-info">
         <span>📊 {ganttCalls.length} výziev s dátumom vyhlásenia</span>
         <span className="gantt-hint">Ctrl + kolečko myši = zoom | Ťahanie = posúvanie</span>
