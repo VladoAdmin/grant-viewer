@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchCalls, GrantCall } from './lib/supabase';
+import { fetchCalls, fetchAllCalls, GrantCall } from './lib/supabase';
 import { ListView } from './components/ListView';
 import { GanttView } from './components/GanttView';
 import { DetailModal } from './components/DetailModal';
@@ -10,13 +10,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'gantt'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    fetchCalls()
+    const loadCalls = showAll ? fetchAllCalls() : fetchCalls();
+    loadCalls
       .then(setCalls)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [showAll]);
 
   return (
     <div className="app">
@@ -43,6 +45,17 @@ function App() {
             📊 Časová os
           </button>
         </nav>
+        <label className="show-all-toggle">
+          <input
+            type="checkbox"
+            checked={showAll}
+            onChange={(e) => {
+              setShowAll(e.target.checked);
+              setLoading(true);
+            }}
+          />
+          Zobraziť aj uzavreté
+        </label>
         <span className="count">{calls.length} výziev</span>
       </header>
 

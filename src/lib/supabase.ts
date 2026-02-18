@@ -39,10 +39,24 @@ export interface GrantAttachment {
 }
 
 export async function fetchCalls(): Promise<GrantCall[]> {
+  // Default: show only active calls (exclude closed/cancelled)
+  const { data, error } = await supabase
+    .from('grant_calls_v2')
+    .select('*')
+    .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná'])
+    .order('announced_at', { ascending: false, nullsFirst: false });
+  
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchAllCalls(): Promise<GrantCall[]> {
+  // For admin view: show all calls including closed
   const { data, error } = await supabase
     .from('grant_calls_v2')
     .select('*')
     .order('announced_at', { ascending: false, nullsFirst: false });
+  
   if (error) throw error;
   return data || [];
 }

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { GrantCall } from '../lib/supabase';
-import { matchesQuery } from '../lib/search';
+import { matchesQuery, semanticSearchCalls } from '../lib/search';
 
 interface Props {
   calls: GrantCall[];
@@ -11,18 +11,50 @@ export function ListView({ calls, onSelect }: Props) {
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const sources = useMemo(() => [...new Set(calls.map(c => c.source))].sort(), [calls]);
   const statuses = useMemo(() => [...new Set(calls.map(c => c.status || 'N/A'))].sort(), [calls]);
 
+  // Semantic search when query changes
+  useEffect(() => {
+    if (search.length < 2) {
+      setSemanticResults(null);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await semanticSearchCalls(search, 20);
+        setSemanticResults(results);
+      } catch (e) {
+        console.error('Semantic search failed:', e);
+        setSemanticResults(null);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
+
   const filtered = useMemo(() => {
     return calls.filter(c => {
-      if (!matchesQuery([c.title, c.source, c.provider], search)) return false;
+      // If we have semantic results, use them
+      if (semanticResults !== null) {
+        if (!semanticResults.includes(c.id)) return false;
+      } else if (search) {
+        // Fallback to text search
+        if (!matchesQuery([c.title, c.source, c.provider], search)) return false;
+      }
+      
       if (sourceFilter && c.source !== sourceFilter) return false;
       if (statusFilter && (c.status || 'N/A') !== statusFilter) return false;
       return true;
     });
-  }, [calls, search, sourceFilter, statusFilter]);
+  }, [calls, search, sourceFilter, statusFilter, semanticResults]);
 
   const formatDate = (d: string | null) => {
     if (!d) return '—';
@@ -39,7 +71,7 @@ export function ListView({ calls, onSelect }: Props) {
       <div className="filters">
         <input
           type="text"
-          placeholder="🔍 Hľadať (názov, zdroj, poskytovateľ)..."
+          placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="search-input"
@@ -49,10 +81,18 @@ export function ListView({ calls, onSelect }: Props) {
           {sources.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">Aktívne (Otvorené/Vyhlásené)</option>
+          <option value="Otvorená">Otvorená</option>
+          <option value="Vyhlásená">Vyhlásená</option>
+          <option value="Plánovaná">Plánovaná</option>
+          <option value="Uzavretá">Uzavretá</option>
+          <option value="Zrušená">Zrušená</option>
           <option value="">Všetky stavy</option>
-          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <span className="result-count">{filtered.length} z {calls.length}</span>
+        <span className="result-count">
+          {isSearching ? '🔍 Hľadám...' : `${filtered.length} z ${calls.length}`}
+          {semanticResults !== null && ' (sémantické)'}
+        </span>
       </div>
 
       <div className="table-container">
