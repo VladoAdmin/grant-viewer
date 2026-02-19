@@ -51,7 +51,7 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
     // Call Supabase RPC for vector search
     const { data, error } = await supabase.rpc('match_call_chunks', {
       query_embedding: embedding,
-      match_threshold: 0.5,
+      match_threshold: 0.15,
       match_count: limit * 2
     });
 
