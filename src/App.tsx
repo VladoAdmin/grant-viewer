@@ -3,6 +3,7 @@ import { fetchCalls, fetchAllCalls, GrantCall } from './lib/supabase';
 import { ListView } from './components/ListView';
 import { GanttView } from './components/GanttView';
 import { DetailModal } from './components/DetailModal';
+import { ChatWidget } from './components/chat/ChatWidget';
 import './App.css';
 
 function App() {
@@ -70,6 +71,8 @@ function App() {
       {selectedId && (
         <DetailModal callId={selectedId} onClose={() => setSelectedId(null)} />
       )}
+
+      <ChatWidget onGrantDetail={(id) => setSelectedId(id)} />
     </div>
   );
 }
