@@ -81,7 +81,7 @@ export function useChat() {
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        text: data.message || 'Nemám odpoveď.',
+        text: data.message || data.reply || 'Nemám odpoveď.',
         timestamp: new Date(),
         grants: data.grants?.length > 0 ? data.grants : undefined,
         refinement_options: data.refinement_options?.length > 0 ? data.refinement_options : undefined,
