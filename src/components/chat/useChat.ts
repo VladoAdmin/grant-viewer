@@ -19,6 +19,8 @@ export interface ChatMessage {
   timestamp: Date;
   grants?: GrantCardData[];
   refinement_options?: string[];
+  keywords?: string[];
+  action?: string;
 }
 
 function getSessionId(): string {
@@ -30,12 +32,12 @@ function getSessionId(): string {
   return id;
 }
 
-export function useChat() {
+export function useChat(onKeywords?: (keywords: string[]) => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'bot',
-      text: 'Ahoj! Som GrantBot. Opýtaj sa ma na granty, výzvy alebo dotácie.',
+      text: 'Ahoj! Som GrantBot. Napíš mi čo hľadáš (napr. "dotácie pre poľnohospodárov v Bratislave").',
       timestamp: new Date(),
     },
   ]);
@@ -81,12 +83,19 @@ export function useChat() {
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        text: data.message || data.reply || 'Nemám odpoveď.',
+        text: data.reply || data.message || 'Nemám odpoveď.',
         timestamp: new Date(),
+        keywords: data.keywords,
+        action: data.action,
         grants: data.grants?.length > 0 ? data.grants : undefined,
         refinement_options: data.refinement_options?.length > 0 ? data.refinement_options : undefined,
       };
       setMessages((prev) => [...prev, botMsg]);
+
+      // Ak máme keywords a callback, zavoláme ho
+      if (data.keywords?.length > 0 && data.action === 'apply_search' && onKeywords) {
+        onKeywords(data.keywords);
+      }
     } catch (err: unknown) {
       clearTimeout(timer);
       let errorText = 'Prepáčte, niečo sa pokazilo. Skúste znova.';
@@ -94,7 +103,6 @@ export function useChat() {
       if (err instanceof DOMException && err.name === 'AbortError') {
         errorText = 'Odpoveď trvá dlhšie, skúste znova.';
       } else if (err instanceof TypeError) {
-        // Network error (fetch failed)
         errorText = 'Prepáčte, niečo sa pokazilo. Skúste znova.';
       } else if (err instanceof Error && err.message === 'server') {
         errorText = 'Server je dočasne nedostupný.';
@@ -111,7 +119,7 @@ export function useChat() {
       abortRef.current = null;
       setIsTyping(false);
     }
-  }, []);
+  }, [onKeywords]);
 
   return { messages, isOpen, isTyping, toggle, sendMessage };
 }

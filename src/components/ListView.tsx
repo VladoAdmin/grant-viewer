@@ -5,10 +5,11 @@ import { matchesQuery, semanticSearchCalls } from '../lib/search';
 interface Props {
   calls: GrantCall[];
   onSelect: (id: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
-export function ListView({ calls, onSelect }: Props) {
-  const [search, setSearch] = useState('');
+export function ListView({ calls, onSelect, searchQuery, onSearchChange }: Props) {
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
@@ -19,7 +20,7 @@ export function ListView({ calls, onSelect }: Props) {
 
   // Semantic search when query changes
   useEffect(() => {
-    if (search.length < 2) {
+    if (searchQuery.length < 2) {
       setSemanticResults(null);
       return;
     }
@@ -27,7 +28,7 @@ export function ListView({ calls, onSelect }: Props) {
     const timeout = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const results = await semanticSearchCalls(search, 20);
+        const results = await semanticSearchCalls(searchQuery, 20);
         setSemanticResults(results);
       } catch (e) {
         console.error('Semantic search failed:', e);
@@ -38,23 +39,23 @@ export function ListView({ calls, onSelect }: Props) {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [search]);
+  }, [searchQuery]);
 
   const filtered = useMemo(() => {
     return calls.filter(c => {
       // If we have semantic results, use them
       if (semanticResults !== null) {
         if (!semanticResults.includes(c.id)) return false;
-      } else if (search) {
+      } else if (searchQuery) {
         // Fallback to text search
-        if (!matchesQuery([c.title, c.source, c.provider], search)) return false;
+        if (!matchesQuery([c.title, c.source, c.provider], searchQuery)) return false;
       }
       
       if (sourceFilter && c.source !== sourceFilter) return false;
       if (statusFilter && (c.status || 'N/A') !== statusFilter) return false;
       return true;
     });
-  }, [calls, search, sourceFilter, statusFilter, semanticResults]);
+  }, [calls, searchQuery, sourceFilter, statusFilter, semanticResults]);
 
   const formatDate = (d: string | null) => {
     if (!d) return '—';
@@ -72,8 +73,8 @@ export function ListView({ calls, onSelect }: Props) {
         <input
           type="text"
           placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
           className="search-input"
         />
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}>

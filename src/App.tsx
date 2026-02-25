@@ -12,6 +12,7 @@ function App() {
   const [view, setView] = useState<'list' | 'gantt'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const loadCalls = showAll ? fetchAllCalls() : fetchCalls();
@@ -20,6 +21,16 @@ function App() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [showAll]);
+
+  // Callback pre keywords z chatbotu
+  const handleChatKeywords = (keywords: string[]) => {
+    const query = keywords.join(' ');
+    setSearchQuery(query);
+    // Prepni na list view ak sme na gantt
+    if (view !== 'list') {
+      setView('list');
+    }
+  };
 
   return (
     <div className="app">
@@ -63,7 +74,12 @@ function App() {
       {loading ? (
         <div className="loading">Načítavam dáta...</div>
       ) : view === 'list' ? (
-        <ListView calls={calls} onSelect={setSelectedId} />
+        <ListView 
+          calls={calls} 
+          onSelect={setSelectedId} 
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+        />
       ) : (
         <GanttView calls={calls} onSelect={setSelectedId} />
       )}
@@ -72,7 +88,10 @@ function App() {
         <DetailModal callId={selectedId} onClose={() => setSelectedId(null)} />
       )}
 
-      <ChatWidget onGrantDetail={(id) => setSelectedId(id)} />
+      <ChatWidget 
+        onGrantDetail={(id) => setSelectedId(id)} 
+        onKeywords={handleChatKeywords}
+      />
     </div>
   );
 }

@@ -7,10 +7,11 @@ import './chat.css';
 
 interface Props {
   onGrantDetail?: (id: string) => void;
+  onKeywords?: (keywords: string[]) => void;
 }
 
-export function ChatWidget({ onGrantDetail }: Props) {
-  const { messages, isOpen, isTyping, toggle, sendMessage } = useChat();
+export function ChatWidget({ onGrantDetail, onKeywords }: Props) {
+  const { messages, isOpen, isTyping, toggle, sendMessage } = useChat(onKeywords);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
