@@ -42,7 +42,7 @@ export function ChatWidget({ onGrantDetail }: Props) {
         </div>
         <div className="chat-messages" ref={listRef}>
           {messages.map((m) => (
-            <MessageBubble key={m.id} message={m} onGrantDetail={onGrantDetail} />
+            <MessageBubble key={m.id} message={m} onGrantDetail={onGrantDetail} onRefinement={sendMessage} />
           ))}
           {isTyping && <TypingIndicator />}
         </div>
