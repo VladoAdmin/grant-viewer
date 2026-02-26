@@ -137,23 +137,36 @@ export function useChat(onQuery?: (query: string) => void) {
       }
       setShowSlowMessage(false);
 
+      // Smart search: send grants to main UI instead of showing in chat
+      const grantCount = data.grants?.length || 0;
+      let botText = data.reply || data.message || 'Nemám odpoveď.';
+      
+      if (grantCount > 0 && onQuery) {
+        // Build search query from user message for main UI
+        const searchQuery = data.search_query || text;
+        onQuery(searchQuery);
+        
+        // Show summary in chat, not the grants
+        botText = `Našiel som ${grantCount} vhodných výziev. Zobrazujem ich v hlavnom okne.`;
+        
+        // Optional: show refinement options if available
+        if (data.refinement_options?.length > 0) {
+          botText += '\n\nChcete upresniť?'; 
+        }
+      }
+      
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
-        text: data.reply || data.message || 'Nemám odpoveď.',
+        text: botText,
         timestamp: new Date(),
         keywords: data.keywords,
         action: data.action,
-        grants: data.grants?.length > 0 ? data.grants : undefined,
+        // Don't show grants in chat - they're sent to main UI
+        grants: undefined,
         refinement_options: data.refinement_options?.length > 0 ? data.refinement_options : undefined,
       };
       setMessages((prev) => [...prev, botMsg]);
-
-      // Ak máme keywords a callback, zavoláme ho
-      if ((data.search_query || data.keywords?.length > 0) && data.action === 'apply_search' && onQuery) {
-        const q = data.search_query || (data.keywords || []).join(' ');
-        onQuery(q);
-      }
     } catch (err: unknown) {
       clearTimeout(timer);
       if (slowTimerRef.current) {

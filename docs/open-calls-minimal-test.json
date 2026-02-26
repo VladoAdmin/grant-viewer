@@ -1,0 +1,41 @@
+{
+  "pass": 2,
+  "fail": 3,
+  "rows": [
+    {
+      "ok": true,
+      "ms": 4248,
+      "q": "kybernetická bezpečnosť",
+      "title": "Kybernetická bezpečnosť v samospráve do 6 000 obyvateľov",
+      "got": "SSC, Modernizácie ciest I. triedy, preložky, obchvat | Kybernetická bezpečnosť v samospráve do 6 000 obyvateľov"
+    },
+    {
+      "ok": false,
+      "ms": 7243,
+      "q": "kapacít policajného",
+      "title": "Posilnenie kapacít Policajného zboru pri špecializovaných činnostiach v oblasti environmentálnej kriminality",
+      "got": ""
+    },
+    {
+      "ok": false,
+      "ms": 1397,
+      "q": "operačná mpsvar",
+      "title": "Operačná podpora MPSVaR",
+      "got": "Rozvoj IKT nástrojov na výkon opatrení sociálnoprávnej ochrany detí a sociálnej kurately | Teaming II – Podpora teamingových výskumných centier | Budovanie a modernizácia systémov včasného varovania  a vyrozumievania"
+    },
+    {
+      "ok": false,
+      "ms": 6424,
+      "q": "osamelých rodičov",
+      "title": "Podpora osamelých rodičov - poradenstvo inak",
+      "got": ""
+    },
+    {
+      "ok": true,
+      "ms": 1417,
+      "q": "individualizovaný komplexný",
+      "title": "Individualizovaný a komplexný prístup so zameraním na poradenské činnosti II./ Poradenstvom k zamestnaniu II.",
+      "got": "SSC, Modernizácie ciest I. triedy, preložky, obchvat | Výzva na predkladanie žiadostí o nenávratný finančný príspevok na  podporu zručností pre posilnenie konkurencieschopnosti a hospodárskeho rastu a budovanie kapacít pre RIS3 | Budovanie sociálnej infraštruktúry"
+    }
+  ]
+}
