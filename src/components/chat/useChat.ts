@@ -39,7 +39,7 @@ function getSessionId(): string {
   return id;
 }
 
-export function useChat(onKeywords?: (keywords: string[]) => void) {
+export function useChat(onQuery?: (query: string) => void) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -134,8 +134,9 @@ export function useChat(onKeywords?: (keywords: string[]) => void) {
       setMessages((prev) => [...prev, botMsg]);
 
       // Ak máme keywords a callback, zavoláme ho
-      if (data.keywords?.length > 0 && data.action === 'apply_search' && onKeywords) {
-        onKeywords(data.keywords);
+      if ((data.search_query || data.keywords?.length > 0) && data.action === 'apply_search' && onQuery) {
+        const q = data.search_query || (data.keywords || []).join(' ');
+        onQuery(q);
       }
     } catch (err: unknown) {
       clearTimeout(timer);
@@ -160,7 +161,7 @@ export function useChat(onKeywords?: (keywords: string[]) => void) {
       abortRef.current = null;
       setIsTyping(false);
     }
-  }, [onKeywords]);
+  }, [onQuery]);
 
   return { messages, isOpen, isTyping, toggle, sendMessage, analyzeCategories };
 }

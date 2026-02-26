@@ -24,8 +24,7 @@ function App() {
   }, [showAll]);
 
   // Callback pre keywords z chatbotu
-  const handleChatKeywords = (keywords: string[]) => {
-    const query = keywords.join(' ');
+  const handleChatQuery = (query: string) => {
     setSearchQuery(query);
     // Prepni na list view ak sme na gantt
     if (view !== 'list') {
@@ -92,7 +91,7 @@ function App() {
 
       <ChatWidget
         onGrantDetail={(id) => setSelectedId(id)}
-        onKeywords={handleChatKeywords}
+        onQuery={handleChatQuery}
         displayedGrantIds={displayedGrantIds}
       />
     </div>
