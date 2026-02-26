@@ -7,9 +7,10 @@ interface Props {
   onSelect: (id: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onResultsChange?: (grantIds: string[]) => void;
 }
 
-export function ListView({ calls, onSelect, searchQuery, onSearchChange }: Props) {
+export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResultsChange }: Props) {
   const [sourceFilter, setSourceFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
@@ -50,12 +51,18 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange }: Props
         // Fallback to text search
         if (!matchesQuery([c.title, c.source, c.provider], searchQuery)) return false;
       }
-      
+
       if (sourceFilter && c.source !== sourceFilter) return false;
       if (statusFilter && (c.status || 'N/A') !== statusFilter) return false;
       return true;
     });
   }, [calls, searchQuery, sourceFilter, statusFilter, semanticResults]);
+
+  // Notify parent about currently displayed grants (for chatbot category analysis)
+  useEffect(() => {
+    if (!onResultsChange) return;
+    onResultsChange(filtered.map(g => g.id));
+  }, [filtered, onResultsChange]);
 
   const formatDate = (d: string | null) => {
     if (!d) return '—';

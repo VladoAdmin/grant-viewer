@@ -248,6 +248,40 @@
   background: #c3d9f7;
 }
 
+/* ===== Categories (NEW) ===== */
+.chat-categories {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.chat-categories-label {
+  font-size: 0.78rem;
+  color: #556;
+  margin-bottom: 6px;
+}
+
+.chat-categories-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat-category-btn {
+  background: #e8f1ff;
+  color: #1f3b6d;
+  border: 1px solid #cfe1ff;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chat-category-btn:hover {
+  background: #d9eaff;
+}
+
 /* ===== Mobile ===== */
 @media (max-width: 480px) {
   .chat-panel {

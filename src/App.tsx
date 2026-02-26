@@ -13,6 +13,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [displayedGrantIds, setDisplayedGrantIds] = useState<string[]>([]);
 
   useEffect(() => {
     const loadCalls = showAll ? fetchAllCalls() : fetchCalls();
@@ -74,11 +75,12 @@ function App() {
       {loading ? (
         <div className="loading">Načítavam dáta...</div>
       ) : view === 'list' ? (
-        <ListView 
-          calls={calls} 
-          onSelect={setSelectedId} 
+        <ListView
+          calls={calls}
+          onSelect={setSelectedId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          onResultsChange={setDisplayedGrantIds}
         />
       ) : (
         <GanttView calls={calls} onSelect={setSelectedId} />
@@ -88,9 +90,10 @@ function App() {
         <DetailModal callId={selectedId} onClose={() => setSelectedId(null)} />
       )}
 
-      <ChatWidget 
-        onGrantDetail={(id) => setSelectedId(id)} 
+      <ChatWidget
+        onGrantDetail={(id) => setSelectedId(id)}
         onKeywords={handleChatKeywords}
+        displayedGrantIds={displayedGrantIds}
       />
     </div>
   );

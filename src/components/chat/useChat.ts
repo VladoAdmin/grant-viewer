@@ -12,6 +12,12 @@ export interface GrantCardData {
   provider: string | null;
 }
 
+export interface GrantCategory {
+  name: string;
+  count: number;
+  type: "sector" | "projectType" | "funding" | "target";
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'bot';
@@ -21,6 +27,7 @@ export interface ChatMessage {
   refinement_options?: string[];
   keywords?: string[];
   action?: string;
+  categories?: GrantCategory[];
 }
 
 function getSessionId(): string {
@@ -46,6 +53,40 @@ export function useChat(onKeywords?: (keywords: string[]) => void) {
   const abortRef = useRef<AbortController | null>(null);
 
   const toggle = useCallback(() => setIsOpen((o) => !o), []);
+
+  // Analýza kategórií zobrazených grantov
+  const analyzeCategories = useCallback(async (grantIds: string[]) => {
+    if (!grantIds || grantIds.length === 0) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/analyze-categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grantIds }),
+      });
+
+      if (!res.ok) {
+        console.error('[analyzeCategories] failed:', res.status);
+        return;
+      }
+
+      const data = await res.json();
+      
+      if (data.categories && data.categories.length > 0) {
+        // Pridaj správu s kategóriami
+        const categoryMsg: ChatMessage = {
+          id: `categories-${Date.now()}`,
+          role: 'bot',
+          text: `Z týchto výziev vidím rôzne zamerania. Chcete špecifikovať?`,
+          timestamp: new Date(),
+          categories: data.categories,
+        };
+        setMessages((prev) => [...prev, categoryMsg]);
+      }
+    } catch (e) {
+      console.error('[analyzeCategories] error:', e);
+    }
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     const userMsg: ChatMessage = {
@@ -121,5 +162,5 @@ export function useChat(onKeywords?: (keywords: string[]) => void) {
     }
   }, [onKeywords]);
 
-  return { messages, isOpen, isTyping, toggle, sendMessage };
+  return { messages, isOpen, isTyping, toggle, sendMessage, analyzeCategories };
 }
