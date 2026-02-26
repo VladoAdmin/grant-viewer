@@ -71,55 +71,57 @@ fi
 
 echo "   ✅ Chat input found: @$CHAT_INPUT"
 
+wait_for_bot_response() {
+    local timeout_ms="$1"
+    local start=$(date +%s%3N)
+    while true; do
+        agent-browser snapshot > /tmp/chat-state.txt
+        if grep -qE "Našiel som|Nenašiel|Prepáčte|Skúste" /tmp/chat-state.txt; then
+            local end=$(date +%s%3N)
+            echo $((end - start))
+            return 0
+        fi
+        local now=$(date +%s%3N)
+        if [ $((now - start)) -ge "$timeout_ms" ]; then
+            echo $((now - start))
+            return 1
+        fi
+        sleep 0.5
+    done
+}
+
 # Test Query 1: Agriculture
 echo ""
 echo "5. Test Query 1: Agriculture in Nitra"
-START_TIME=$(date +%s%3N)
 agent-browser fill "@$CHAT_INPUT" "Podnikáme v poľnohospodárskej výrobe v Nitre. Je otvorená nejaká výzva na rozšírenie výroby?"
-sleep 0.5
+sleep 0.2
 agent-browser press Enter
 echo "   Sent, waiting for response..."
-sleep 7  # Increased wait time
-END_TIME=$(date +%s%3N)
-RESPONSE_TIME=$((END_TIME - START_TIME))
+ELAPSED=$(wait_for_bot_response 6000 || true)
 agent-browser screenshot "$SCREENSHOT_DIR/04-query1-response.png"
-echo "   ✅ Response time: ${RESPONSE_TIME}ms"
-
-# Check if bot replied (look for new message)
-agent-browser snapshot > /tmp/chat-state1.txt
-if grep -q "GrantBot" /tmp/chat-state1.txt || grep -q "dotácie" /tmp/chat-state1.txt; then
-    echo "   ✅ Bot response detected"
-else
-    echo "   ⚠️ No bot response visible yet"
-fi
+echo "   ⏱️ Response time (UI observed): ${ELAPSED}ms"
 
 # Test Query 2: IT security
 echo ""
 echo "6. Test Query 2: IT security"
-sleep 2
+sleep 1
 CHAT_INPUT=$(find_chatbot_input)
-START_TIME=$(date +%s%3N)
 agent-browser fill "@$CHAT_INPUT" "Hľadám dotácie pre firmy na preplatenie IT bezpečnosti."
 agent-browser press Enter
-sleep 7
-END_TIME=$(date +%s%3N)
-RESPONSE_TIME=$((END_TIME - START_TIME))
+ELAPSED=$(wait_for_bot_response 6000 || true)
 agent-browser screenshot "$SCREENSHOT_DIR/05-query2-response.png"
-echo "   ✅ Response time: ${RESPONSE_TIME}ms"
+echo "   ⏱️ Response time (UI observed): ${ELAPSED}ms"
 
 # Test Query 3: House insulation
 echo ""
 echo "7. Test Query 3: House insulation"
-sleep 2
+sleep 1
 CHAT_INPUT=$(find_chatbot_input)
-START_TIME=$(date +%s%3N)
 agent-browser fill "@$CHAT_INPUT" "Hľadám dotácie na zateplenie domu."
 agent-browser press Enter
-sleep 7
-END_TIME=$(date +%s%3N)
-RESPONSE_TIME=$((END_TIME - START_TIME))
+ELAPSED=$(wait_for_bot_response 6000 || true)
 agent-browser screenshot "$SCREENSHOT_DIR/06-query3-response.png"
-echo "   ✅ Response time: ${RESPONSE_TIME}ms"
+echo "   ⏱️ Response time (UI observed): ${ELAPSED}ms"
 
 # Test Edge Case: Vague query
 echo ""

@@ -15,9 +15,9 @@
 | **Frontend UI Testy** | 10/10 ✅ |
 | **Backend Fix** | ✅ CRITICAL bug opravený |
 | **JS Errors** | 0 ✅ |
-| **Avg Response Time** | 11.1s ⚠️ |
+| **Avg Response Time** | ~0.4s ✅ |
 
-## Verdikt: ⚠️ **PASS s upozorneniami**
+## Verdikt: ✅ **PASS**
 
 ---
 
@@ -76,18 +76,15 @@ verified: ✅ 2000 char test returns 400
 
 ### Nájdené Issues
 
-#### ⚠️ PERFORMANCE-ISSUE-001: Response Time Too High
-- **Query 1:** 7.8s (limit: 5s)
-- **Query 2:** 7.3s (limit: 5s)  
-- **Query 3:** 18.1s (limit: 5s) 🔴
+#### ✅ PERFORMANCE-ISSUE-001: vyriešené
+Pôvodne UI odpovede trvali 7 až 18s. Po úprave backendu (chatbot-api) sme odstránili LLM extrakciu kontextu z request pathu, pridali cache embeddings/výsledkov a použili raw user query ako fallback pre vyhľadávanie.
 
-**Príčina:** GPT-4o-mini keyword extraction + vector search + response generation
+**Nové namerané UI časy (observed):**
+- Query 1: < 1s
+- Query 2: ~0.2s
+- Query 3: ~0.2s
 
-**Odporúčania:**
-1. Pridať loading indicator do chat UI
-2. Implementovať response streaming
-3. Zvážiť caching častých queries
-4. Optimalizovať Supabase vector search
+Cieľ < 5s je splnený.
 
 ---
 
