@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function ChatWidget({ onGrantDetail, onQuery, displayedGrantIds }: Props) {
-  const { messages, isOpen, isTyping, toggle, sendMessage, analyzeCategories } = useChat(onQuery);
+  const { messages, isOpen, isTyping, showSlowMessage, toggle, sendMessage, analyzeCategories } = useChat(onQuery);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,6 +66,11 @@ export function ChatWidget({ onGrantDetail, onQuery, displayedGrantIds }: Props)
             />
           ))}
           {isTyping && <TypingIndicator />}
+          {showSlowMessage && (
+            <div className="chat-slow-message">
+              ⏳ Hľadám pre vás tie najlepšie výzvy... To môže chvíľu trvať.
+            </div>
+          )}
         </div>
         <ChatInput onSend={sendMessage} disabled={isTyping} />
       </div>

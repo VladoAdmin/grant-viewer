@@ -3,6 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 const API_BASE = 'https://api.stormlevel.com';
 const SESSION_KEY = 'grantbot_session_id';
 const TIMEOUT_MS = 30_000;
+const SLOW_THRESHOLD_MS = 5_000; // fallback hláška ak trvá dlhšie
 
 export interface GrantCardData {
   id: string;
@@ -50,7 +51,9 @@ export function useChat(onQuery?: (query: string) => void) {
   ]);
   const [isOpen, setIsOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [showSlowMessage, setShowSlowMessage] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggle = useCallback(() => setIsOpen((o) => !o), []);
 
@@ -97,10 +100,16 @@ export function useChat(onQuery?: (query: string) => void) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsTyping(true);
+    setShowSlowMessage(false);
 
     const controller = new AbortController();
     abortRef.current = controller;
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    // Fallback hláška ak odpoveď trvá dlhšie ako 5s
+    slowTimerRef.current = setTimeout(() => {
+      setShowSlowMessage(true);
+    }, SLOW_THRESHOLD_MS);
 
     try {
       const res = await fetch(`${API_BASE}/api/chat`, {
@@ -121,6 +130,13 @@ export function useChat(onQuery?: (query: string) => void) {
 
       const data = await res.json();
 
+      // Zrušenie fallback hlášky ak prišla odpoveď
+      if (slowTimerRef.current) {
+        clearTimeout(slowTimerRef.current);
+        slowTimerRef.current = null;
+      }
+      setShowSlowMessage(false);
+
       const botMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'bot',
@@ -140,6 +156,10 @@ export function useChat(onQuery?: (query: string) => void) {
       }
     } catch (err: unknown) {
       clearTimeout(timer);
+      if (slowTimerRef.current) {
+        clearTimeout(slowTimerRef.current);
+        slowTimerRef.current = null;
+      }
       let errorText = 'Prepáčte, niečo sa pokazilo. Skúste znova.';
 
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -157,11 +177,12 @@ export function useChat(onQuery?: (query: string) => void) {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errMsg]);
+      setShowSlowMessage(false);
     } finally {
       abortRef.current = null;
       setIsTyping(false);
     }
   }, [onQuery]);
 
-  return { messages, isOpen, isTyping, toggle, sendMessage, analyzeCategories };
+  return { messages, isOpen, isTyping, showSlowMessage, toggle, sendMessage, analyzeCategories };
 }
