@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { GrantCall } from '../lib/supabase';
-import { matchesQuery, semanticSearchCalls, classifyQuery, type QueryIntent } from '../lib/search';
+import { matchesQuery, semanticSearchCalls, classifyQuery, sanitizeQuery, type QueryIntent } from '../lib/search';
 
 interface Props {
   calls: GrantCall[];
@@ -50,14 +50,19 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   }, [searchQuery]);
 
   const filtered = useMemo(() => {
+    // Check if semantic results actually intersect with loaded calls
+    const loadedIds = new Set(calls.map(c => c.id));
+    const hasUsableSemanticResults = semanticResults !== null
+      && semanticResults.length > 0
+      && semanticResults.some(id => loadedIds.has(id));
+
     return calls.filter(c => {
-      // If we have semantic results with actual matches, use them
-      // If semantic search returned empty [], fallback to text search
-      if (semanticResults !== null && semanticResults.length > 0) {
-        if (!semanticResults.includes(c.id)) return false;
+      // Use semantic results only if they match loaded calls
+      if (hasUsableSemanticResults) {
+        if (!semanticResults!.includes(c.id)) return false;
       } else if (searchQuery) {
-        // Fallback to text search
-        if (!matchesQuery([c.title, c.source, c.provider], searchQuery)) return false;
+        // Fallback to text search (includes when semantic returned no matching IDs)
+        if (!matchesQuery([c.title, c.source, c.provider, c.eligible_applicants], searchQuery)) return false;
       }
 
       if (sourceFilter && c.source !== sourceFilter) return false;
@@ -89,6 +94,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
           <input
             type="text"
             placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
+            maxLength={200}
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             className="search-input"
@@ -118,8 +124,13 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
         </select>
         <span className="result-count">
           {isSearching ? '🔍 Hľadám...' : `${filtered.length} z ${calls.length}`}
-          {semanticResults !== null && semanticResults.length > 0 && ' (sémantické)'}
-          {semanticResults !== null && semanticResults.length === 0 && searchQuery.length >= 2 && ' (textové)'}
+          {(() => {
+            const loadedIds = new Set(calls.map(c => c.id));
+            const usable = semanticResults !== null && semanticResults.length > 0 && semanticResults.some(id => loadedIds.has(id));
+            if (usable) return ' (sémantické)';
+            if (searchQuery.length >= 3) return ' (textové)';
+            return '';
+          })()}
         </span>
       </div>
 

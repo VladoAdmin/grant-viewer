@@ -1,6 +1,57 @@
 import { supabase } from './supabase';
 
 /**
+ * Input sanitization and guardrails
+ */
+const MAX_QUERY_LENGTH = 200;
+const RATE_LIMIT_MS = 500;
+let lastSearchTime = 0;
+
+// Prompt injection patterns to block
+const INJECTION_PATTERNS = [
+  /ignore\s+(previous|above|all)/i,
+  /system\s*prompt/i,
+  /you\s+are\s+(now|a)/i,
+  /forget\s+(everything|all|previous)/i,
+  /\b(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE)\s+/i,
+  /<script/i,
+  /javascript:/i,
+  /on(error|load|click)=/i,
+  /\{\{.*\}\}/,  // template injection
+  /\$\{.*\}/,     // template literal injection
+];
+
+export function sanitizeQuery(input: string): string {
+  // Trim and limit length
+  let clean = input.trim().slice(0, MAX_QUERY_LENGTH);
+  
+  // Remove HTML tags
+  clean = clean.replace(/<[^>]*>/g, '');
+  
+  // Remove potential script content
+  clean = clean.replace(/[<>{}\[\]\\]/g, '');
+  
+  // Check for injection patterns
+  for (const pattern of INJECTION_PATTERNS) {
+    if (pattern.test(clean)) {
+      console.warn('[Security] Potential injection blocked:', clean.slice(0, 50));
+      return ''; // Return empty to show all results
+    }
+  }
+  
+  return clean;
+}
+
+function isRateLimited(): boolean {
+  const now = Date.now();
+  if (now - lastSearchTime < RATE_LIMIT_MS) {
+    return true;
+  }
+  lastSearchTime = now;
+  return false;
+}
+
+/**
  * Query intent classification - identifies what the user is looking for
  */
 export interface QueryIntent {
@@ -64,6 +115,7 @@ function normalize(text: string): string {
 }
 
 export function classifyQuery(query: string): QueryIntent {
+  query = sanitizeQuery(query);
   const q = normalize(query);
   const intent: QueryIntent = {
     applicantTerms: [],
@@ -153,6 +205,8 @@ async function getQueryEmbedding(query: string): Promise<number[] | null> {
  * Returns call IDs ordered by relevance
  */
 export async function semanticSearchCalls(query: string, limit: number = 20): Promise<string[]> {
+  query = sanitizeQuery(query);
+  if (!query || isRateLimited()) return [];
   const intent = classifyQuery(query);
 
   // 1. Vector search via embeddings
