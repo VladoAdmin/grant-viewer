@@ -94,6 +94,12 @@ function buildSections(call: GrantCall, attrs: GrantAttribute[]): Section[] {
   // OPRÁVNENÉ AKTIVITY
   add('OPRÁVNENÉ AKTIVITY', pickAttr(attrs, ['Oprávnené aktivity']));
 
+  // OPRÁVNENÉ VÝDAVKY
+  add('OPRÁVNENÉ VÝDAVKY', pickAttr(attrs, ['Oprávnené výdavky']));
+
+  // ČASOVÁ OPRÁVNENOSŤ
+  add('ČASOVÁ OPRÁVNENOSŤ', pickAttr(attrs, ['Časová oprávnenosť', 'Oprávnené obdobie']));
+
   // KRITÉRIÁ VÝBERU
   add('KRITÉRIÁ VÝBERU', pickAttr(attrs, ['Kritériá výberu']));
 
