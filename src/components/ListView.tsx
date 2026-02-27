@@ -22,7 +22,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
 
   // Semantic search when query changes
   useEffect(() => {
-    if (searchQuery.length < 2) {
+    if (searchQuery.length < 3) {
       setSemanticResults(null);
       setQueryIntent(null);
       return;
@@ -36,7 +36,8 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
       setIsSearching(true);
       try {
         const results = await semanticSearchCalls(searchQuery, 20);
-        setSemanticResults(results);
+        // If semantic returned nothing, set null to fallback to text search
+        setSemanticResults(results.length > 0 ? results : null);
       } catch (e) {
         console.error('Semantic search failed:', e);
         setSemanticResults(null);
