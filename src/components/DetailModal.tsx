@@ -3,6 +3,7 @@ import {
   fetchCalls, fetchAttributes, fetchAttachments,
   GrantCall, GrantAttribute, GrantAttachment
 } from '../lib/supabase';
+import { generateCallMonitoringPdf } from '../lib/reportPdf';
 
 interface Props {
   callId: string;
@@ -57,6 +58,23 @@ export function DetailModal({ callId, onClose }: Props) {
         ) : (
           <>
             <h2>{call.title}</h2>
+
+            <div style={{ display: 'flex', gap: 8, margin: '10px 0 18px' }}>
+              <button
+                style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #3b82f6", background: "#2563eb", color: "white", cursor: "pointer" }}
+                onClick={() => {
+                  try {
+                    const { doc, filename } = generateCallMonitoringPdf(call, attrs);
+                    doc.save(filename);
+                  } catch (e) {
+                    console.error('PDF generation failed', e);
+                    alert('Nepodarilo sa vygenerovať PDF.');
+                  }
+                }}
+              >
+                ⬇️ Stiahnuť sumár (PDF)
+              </button>
+            </div>
 
             <div className="detail-grid">
               <div className="detail-field">

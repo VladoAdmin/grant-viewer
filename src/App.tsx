@@ -3,7 +3,6 @@ import { fetchCalls, fetchAllCalls, GrantCall } from './lib/supabase';
 import { ListView } from './components/ListView';
 import { GanttView } from './components/GanttView';
 import { DetailModal } from './components/DetailModal';
-import { ChatWidget } from './components/chat/ChatWidget';
 import './App.css';
 
 function App() {
@@ -13,7 +12,6 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [displayedGrantIds, setDisplayedGrantIds] = useState<string[]>([]);
 
   useEffect(() => {
     const loadCalls = showAll ? fetchAllCalls() : fetchCalls();
@@ -22,15 +20,6 @@ function App() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [showAll]);
-
-  // Callback pre keywords z chatbotu
-  const handleChatQuery = (query: string) => {
-    setSearchQuery(query);
-    // Prepni na list view ak sme na gantt
-    if (view !== 'list') {
-      setView('list');
-    }
-  };
 
   return (
     <div className="app">
@@ -79,7 +68,6 @@ function App() {
           onSelect={setSelectedId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onResultsChange={setDisplayedGrantIds}
         />
       ) : (
         <GanttView calls={calls} onSelect={setSelectedId} />
@@ -88,12 +76,6 @@ function App() {
       {selectedId && (
         <DetailModal callId={selectedId} onClose={() => setSelectedId(null)} />
       )}
-
-      <ChatWidget
-        onGrantDetail={(id) => setSelectedId(id)}
-        onQuery={handleChatQuery}
-        displayedGrantIds={displayedGrantIds}
-      />
     </div>
   );
 }

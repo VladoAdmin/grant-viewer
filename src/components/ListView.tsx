@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { GrantCall } from '../lib/supabase';
-import { matchesQuery, semanticSearchCalls } from '../lib/search';
+import { matchesQuery, semanticSearchCalls, classifyQuery, type QueryIntent } from '../lib/search';
 
 interface Props {
   calls: GrantCall[];
@@ -15,6 +15,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   const [statusFilter, setStatusFilter] = useState('');
   const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [queryIntent, setQueryIntent] = useState<QueryIntent | null>(null);
 
   const sources = useMemo(() => [...new Set(calls.map(c => c.source))].sort(), [calls]);
   const statuses = useMemo(() => [...new Set(calls.map(c => c.status || 'N/A'))].sort(), [calls]);
@@ -25,6 +26,10 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
       setSemanticResults(null);
       return;
     }
+
+    // Classify query intent
+    const intent = classifyQuery(searchQuery);
+    setQueryIntent(intent);
 
     const timeout = setTimeout(async () => {
       setIsSearching(true);
@@ -102,6 +107,23 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
           {semanticResults !== null && ' (sémantické)'}
         </span>
       </div>
+
+      {queryIntent && (queryIntent.applicantTerms.length > 0 || queryIntent.locationTerms.length > 0 || queryIntent.sectorTerms.length > 0 || queryIntent.projectFocusTerms.length > 0) && (
+        <div className="intent-badges">
+          {queryIntent.applicantTerms.map(t => (
+            <span key={`a-${t}`} className="intent-badge applicant">👤 {t}</span>
+          ))}
+          {queryIntent.locationTerms.map(t => (
+            <span key={`l-${t}`} className="intent-badge location">📍 {t}</span>
+          ))}
+          {queryIntent.sectorTerms.map(t => (
+            <span key={`s-${t}`} className="intent-badge sector">🏭 {t}</span>
+          ))}
+          {queryIntent.projectFocusTerms.map(t => (
+            <span key={`p-${t}`} className="intent-badge focus">🎯 {t}</span>
+          ))}
+        </div>
+      )}
 
       <div className="table-container">
         <table>
