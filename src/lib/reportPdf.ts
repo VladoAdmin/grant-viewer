@@ -14,8 +14,8 @@ function pickAttr(attrs: GrantAttribute[], keys: string[]): string | null {
   return null;
 }
 
-function formatMoney(value: string | number | null | undefined): string {
-  if (value === null || value === undefined || value === '') return null as unknown as string;
+function formatMoney(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
   const num = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^\d.-]/g, ''));
   if (isNaN(num)) return String(value);
   return new Intl.NumberFormat('sk-SK', { maximumFractionDigits: 0 }).format(num) + ' EUR';
@@ -25,7 +25,7 @@ function formatDate(d: string | null | undefined): string | null {
   if (!d) return null;
   try {
     const date = new Date(d);
-    if (isNaN(date.getTime())) return d; // return raw string if unparseable
+    if (isNaN(date.getTime())) return d;
     return date.toLocaleDateString('sk-SK');
   } catch {
     return d;
@@ -34,90 +34,111 @@ function formatDate(d: string | null | undefined): string | null {
 
 interface Section {
   label: string;
-  value: string | null;
+  value: string;
 }
 
 function buildSections(call: GrantCall, attrs: GrantAttribute[]): Section[] {
-  // Build harmonogram
-  const announcedRaw = call.announced_at || pickAttr(attrs, ['Dátum vyhlásenia']);
-  const deadlineRaw = call.deadline_at || pickAttr(attrs, ['Dátum ukončenia', 'Dátum uzávierky']);
-  const harmonogram = [
-    announcedRaw ? `vyhlásenie výzvy: ${formatDate(announcedRaw) || announcedRaw}` : null,
-    deadlineRaw ? `uzávierka výzvy: ${formatDate(deadlineRaw) || deadlineRaw}` : null,
-  ].filter(Boolean).join('\n');
+  const sections: Section[] = [];
+  const add = (label: string, value: string | null | undefined) => {
+    if (value && value.trim()) sections.push({ label, value: value.trim() });
+  };
 
-  // Build allocation
-  const allocationVal = call.total_allocation
+  // VÝZVA
+  add('VÝZVA:', call.title);
+
+  // POSKYTOVATEĽ
+  add('POSKYTOVATEĽ:', call.provider
+    || pickAttr(attrs, ['Poskytovateľ', 'Vyhlasovateľ výzvy', 'vyhlasovatel_vyzvy', 'Vykonávatelia / rezorty', 'Vykonávatelia']));
+
+  // CIEĽ VÝZVY
+  add('CIEĽ VÝZVY', pickAttr(attrs, ['Cieľ výzvy', 'Cieľ', 'Špecifický cieľ'])
+    || pickAttr(attrs, ['Oblasť', 'Názov reformy']));
+
+  // HARMONOGRAM - 3 riadky
+  const announced = call.announced_at || pickAttr(attrs, ['Dátum vyhlásenia']);
+  const deadline = call.deadline_at || pickAttr(attrs, ['Dátum ukončenia', 'Dátum uzávierky']);
+  const predkladanie = pickAttr(attrs, ['Predkladanie', 'Miesto pre podanie ŽoNFP']);
+  
+  const harmonogramParts: string[] = [];
+  if (announced) harmonogramParts.push('Vyhlásenie výzvy: ' + (formatDate(announced) || announced));
+  if (predkladanie) harmonogramParts.push('Predkladanie: ' + predkladanie);
+  if (deadline) harmonogramParts.push('Uzatvorenie výzvy: ' + (formatDate(deadline) || deadline));
+  if (harmonogramParts.length > 0) {
+    add('HARMONOGRAM VÝZVY', harmonogramParts.join('\n'));
+  }
+
+  // ALOKÁCIA VÝZVY
+  const alloc = call.total_allocation
     ? formatMoney(call.total_allocation)
-    : pickAttr(attrs, ['Celková alokácia', 'Alokácia', 'alokacia_eu', 'Alokácia EÚ']);
+    : (pickAttr(attrs, ['Celková alokácia', 'Alokácia', 'alokacia_eu', 'Alokácia EÚ']));
+  add('ALOKÁCIA VÝZVY', alloc);
 
-  // Financial params
+  // PROJEKT (finančné parametre)
   const maxGrant = pickAttr(attrs, ['Max. grant', 'Max. podpora na projekt', 'Max. podpora']);
   const minGrant = pickAttr(attrs, ['Min. podpora na projekt', 'Min. podpora']);
-  const financialParams = [maxGrant, minGrant].filter(Boolean).join('\n') || null;
+  const projectParts: string[] = [];
+  if (maxGrant) projectParts.push('maximálna výška na 1 projekt: ' + maxGrant);
+  if (minGrant) projectParts.push('minimálna výška na 1 projekt: ' + minGrant);
+  if (projectParts.length > 0) add('PROJEKT', projectParts.join('\n'));
 
-  return [
-    { label: 'NÁZOV:', value: call.title },
-    { label: 'KÓD VÝZVY:', value: pickAttr(attrs, ['Kód výzvy', 'Kód']) || call.call_type },
-    { label: 'POSKYTOVATEĽ:', value: call.provider || pickAttr(attrs, ['Poskytovateľ', 'Vyhlasovateľ výzvy', 'vyhlasovatel_vyzvy', 'Vykonávatelia / rezorty', 'Vykonávatelia']) },
-    { label: 'CIEĽ VÝZVY', value: pickAttr(attrs, ['Cieľ výzvy', 'Cieľ', 'Špecifický cieľ', 'Oblasť', 'Názov reformy']) },
-    { label: 'ALOKÁCIA VÝZVY', value: allocationVal ? formatMoney(allocationVal) || allocationVal : null },
-    { label: 'OPRÁVNENÉ ÚZEMIE', value: pickAttr(attrs, ['Miesto realizácie', 'Oprávnené územie']) },
-    { label: 'FINANČNÉ PARAMETRE NA PROJEKT', value: financialParams },
-    { label: 'SPOLUÚČASŤ ŽIADATEĽA', value: pickAttr(attrs, ['Miera spolufinancovania', 'Spoluúčasť']) },
-    { label: 'ČASOVÝ HARMONOGRAM VÝZVY', value: harmonogram || null },
-    { label: 'ČASOVÁ OPRÁVNENOSŤ REALIZÁCIE PROJEKTU', value: pickAttr(attrs, ['Časová oprávnenosť']) },
-    { label: 'OPRÁVNENÝ ŽIADATEĽ', value: call.eligible_applicants || pickAttr(attrs, ['opravneni_ziadatelia', 'Oprávnení žiadatelia', 'Cieľová skupina']) },
-    { label: 'OPRÁVNENÉ AKTIVITY', value: pickAttr(attrs, ['Oprávnené aktivity']) },
-    { label: 'KRITÉRIÁ VÝBERU', value: pickAttr(attrs, ['Kritériá výberu']) },
-    { label: 'PROGRAM', value: pickAttr(attrs, ['Program', 'Komponent']) },
-    { label: 'ĎALŠIE INFORMÁCIE', value: pickAttr(attrs, ['Doplňujúce informácie', 'Ďalšie podmienky']) },
-  ];
+  // OPRÁVNENÉ ÚZEMIE
+  add('OPRÁVNENÉ ÚZEMIE', pickAttr(attrs, ['Miesto realizácie', 'Oprávnené územie']));
+
+  // SPOLUÚČASŤ
+  add('SPOLUÚČASŤ', pickAttr(attrs, ['Miera spolufinancovania', 'Spoluúčasť']));
+
+  // OPRÁVNENÝ ŽIADATEĽ
+  add('OPRÁVNENÝ ŽIADATEĽ', call.eligible_applicants
+    || pickAttr(attrs, ['opravneni_ziadatelia', 'Oprávnení žiadatelia', 'Cieľová skupina 1']));
+
+  // OPRÁVNENÉ AKTIVITY
+  add('OPRÁVNENÉ AKTIVITY', pickAttr(attrs, ['Oprávnené aktivity']));
+
+  // KRITÉRIÁ VÝBERU
+  add('KRITÉRIÁ VÝBERU', pickAttr(attrs, ['Kritériá výberu']));
+
+  // PROGRAM / KOMPONENT
+  add('PROGRAM', pickAttr(attrs, ['Program', 'Komponent']));
+
+  // ĎALŠIE PODMIENKY
+  add('ĎALŠIE PODMIENKY', pickAttr(attrs, ['Ďalšie podmienky', 'Doplňujúce informácie']));
+
+  // KÓD VÝZVY
+  add('KÓD VÝZVY', pickAttr(attrs, ['Kód výzvy', 'Kód']));
+
+  return sections;
 }
 
 function createReportHtml(call: GrantCall, attrs: GrantAttribute[]): string {
   const sections = buildSections(call, attrs);
-  const filledSections = sections.filter(s => s.value);
 
-  const rows = filledSections.map(s => `
+  const rows = sections.map(s => `
     <tr>
       <td class="label">${s.label}</td>
-      <td class="value">${(s.value || '').replace(/\n/g, '<br>')}</td>
+      <td class="value">${s.value.replace(/\n/g, '<br>').replace(/·/g, '&bull;')}</td>
     </tr>
   `).join('');
 
   return `
     <div id="pdf-report" style="
       width: 595px;
-      padding: 40px 48px;
-      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+      padding: 36px 44px;
+      font-family: 'Segoe UI', Arial, sans-serif;
       font-size: 11px;
       line-height: 1.5;
       color: #1a1a1a;
       background: white;
     ">
-      <h2 style="
-        text-align: center;
-        font-size: 13px;
-        font-weight: bold;
-        margin: 0 0 24px 0;
-        letter-spacing: 0.5px;
-        line-height: 1.4;
-      ">
-        MONITORING – FINANCOVANIE Z<br>
-        PROSTRIEDKOV EÚ A ŠTÁTNEHO ROZPOČTU SR
-      </h2>
-
-      <table style="width: 100%; border-collapse: collapse;">
-        ${rows}
+      <table style="width: 100%; border-collapse: collapse; border: 1px solid #999;">
+        <tbody>
+          ${rows}
+        </tbody>
       </table>
 
       <div style="
-        margin-top: 40px;
-        padding-top: 12px;
-        border-top: 1px solid #ccc;
+        margin-top: 32px;
         font-size: 9px;
-        color: #666;
+        color: #888;
         text-align: center;
       ">
         www.stormlevel.com
@@ -127,16 +148,15 @@ function createReportHtml(call: GrantCall, attrs: GrantAttribute[]): string {
     <style>
       #pdf-report td {
         vertical-align: top;
-        padding: 6px 4px;
-        border-bottom: 1px solid #eee;
+        padding: 8px 10px;
+        border: 1px solid #bbb;
       }
       #pdf-report td.label {
         font-weight: bold;
-        width: 220px;
-        white-space: nowrap;
+        width: 180px;
         font-size: 10px;
-        text-transform: uppercase;
-        color: #333;
+        background: #f5f5f5;
+        color: #222;
       }
       #pdf-report td.value {
         font-size: 11px;
@@ -147,7 +167,6 @@ function createReportHtml(call: GrantCall, attrs: GrantAttribute[]): string {
 }
 
 export async function generateCallMonitoringPdf(call: GrantCall, attrs: GrantAttribute[]): Promise<{ filename: string }> {
-  // Create off-screen container
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.left = '-9999px';
@@ -176,7 +195,6 @@ export async function generateCallMonitoringPdf(call: GrantCall, attrs: GrantAtt
     if (imgHeight <= pageHeight) {
       pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
     } else {
-      // Multi-page
       let remainingHeight = canvas.height;
       let position = 0;
       const pageCanvasHeight = (pageHeight * canvas.width) / pageWidth;
