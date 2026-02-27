@@ -324,3 +324,30 @@ td { padding: 8px 12px; vertical-align: top; }
   color: var(--text);
   background: var(--surface2);
 }
+
+/* ===== Search Button ===== */
+.search-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s, opacity 0.15s;
+}
+.search-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+.search-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.search-clear {
+  padding: 8px 12px;
+  font-size: 13px;
+  position: static;
+  transform: none;
+}

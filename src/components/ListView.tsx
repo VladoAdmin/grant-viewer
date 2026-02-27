@@ -16,38 +16,42 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   const [semanticResults, setSemanticResults] = useState<string[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [queryIntent, setQueryIntent] = useState<QueryIntent | null>(null);
+  const [activeQuery, setActiveQuery] = useState('');
 
   const sources = useMemo(() => [...new Set(calls.map(c => c.source))].sort(), [calls]);
   const statuses = useMemo(() => [...new Set(calls.map(c => c.status || 'N/A'))].sort(), [calls]);
 
-  // Semantic search when query changes
-  useEffect(() => {
-    if (searchQuery.length < 3) {
+  // Execute search on demand (button click or Enter)
+  const executeSearch = async () => {
+    const query = searchQuery.trim();
+    setActiveQuery(query);
+    
+    if (query.length < 2) {
       setSemanticResults(null);
       setQueryIntent(null);
       return;
     }
 
-    // Classify query intent
-    const intent = classifyQuery(searchQuery);
+    const intent = classifyQuery(query);
     setQueryIntent(intent);
 
-    const timeout = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const results = await semanticSearchCalls(searchQuery, 20);
-        // If semantic returned nothing, set null to fallback to text search
-        setSemanticResults(results.length > 0 ? results : null);
-      } catch (e) {
-        console.error('Semantic search failed:', e);
-        setSemanticResults(null);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
+    setIsSearching(true);
+    try {
+      const results = await semanticSearchCalls(query, 20);
+      setSemanticResults(results.length > 0 ? results : null);
+    } catch (e) {
+      console.error('Semantic search failed:', e);
+      setSemanticResults(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      executeSearch();
+    }
+  };
 
   const filtered = useMemo(() => {
     // Check if semantic results actually intersect with loaded calls
@@ -60,16 +64,16 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
       // Use semantic results only if they match loaded calls
       if (hasUsableSemanticResults) {
         if (!semanticResults!.includes(c.id)) return false;
-      } else if (searchQuery) {
+      } else if (activeQuery) {
         // Fallback to text search (includes when semantic returned no matching IDs)
-        if (!matchesQuery([c.title, c.source, c.provider, c.eligible_applicants], searchQuery)) return false;
+        if (!matchesQuery([c.title, c.source, c.provider, c.eligible_applicants], activeQuery)) return false;
       }
 
       if (sourceFilter && c.source !== sourceFilter) return false;
       if (statusFilter && (c.status || 'N/A') !== statusFilter) return false;
       return true;
     });
-  }, [calls, searchQuery, sourceFilter, statusFilter, semanticResults]);
+  }, [calls, activeQuery, sourceFilter, statusFilter, semanticResults]);
 
   // Notify parent about currently displayed grants (for chatbot category analysis)
   useEffect(() => {
@@ -93,19 +97,27 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
         <div className="search-wrapper">
           <input
             type="text"
-            placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
+            placeholder="🔍 Zadajte kľúčové slová (napr. voda, obce, inovácie...)"
             maxLength={200}
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="search-input"
           />
-          {searchQuery && (
+          <button
+            className="search-btn"
+            onClick={executeSearch}
+            disabled={isSearching || !searchQuery.trim()}
+          >
+            {isSearching ? '⏳' : '🔍'} Vyhľadať
+          </button>
+          {activeQuery && (
             <button
               className="search-clear"
-              onClick={() => { onSearchChange(''); setSemanticResults(null); setQueryIntent(null); }}
-              aria-label="Vymazať vyhľadávanie"
+              onClick={() => { onSearchChange(''); setActiveQuery(''); setSemanticResults(null); setQueryIntent(null); }}
+              aria-label="Zrušiť vyhľadávanie"
             >
-              ✕
+              ✕ Zrušiť
             </button>
           )}
         </div>
@@ -128,7 +140,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
             const loadedIds = new Set(calls.map(c => c.id));
             const usable = semanticResults !== null && semanticResults.length > 0 && semanticResults.some(id => loadedIds.has(id));
             if (usable) return ' (sémantické)';
-            if (searchQuery.length >= 3) return ' (textové)';
+            if (activeQuery.length >= 2) return ' (textové)';
             return '';
           })()}
         </span>
