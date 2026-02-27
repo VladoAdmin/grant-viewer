@@ -295,3 +295,32 @@ td { padding: 8px 12px; vertical-align: top; }
   color: #c4b5fd;
   border: 1px solid rgba(168, 85, 247, 0.3);
 }
+
+/* ===== Search Wrapper with Clear Button ===== */
+.search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+.search-wrapper .search-input {
+  width: 100%;
+  padding-right: 36px;
+}
+.search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.search-clear:hover {
+  color: var(--text);
+  background: var(--surface2);
+}

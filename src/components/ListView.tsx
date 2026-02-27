@@ -24,6 +24,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   useEffect(() => {
     if (searchQuery.length < 2) {
       setSemanticResults(null);
+      setQueryIntent(null);
       return;
     }
 
@@ -49,8 +50,9 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
 
   const filtered = useMemo(() => {
     return calls.filter(c => {
-      // If we have semantic results, use them
-      if (semanticResults !== null) {
+      // If we have semantic results with actual matches, use them
+      // If semantic search returned empty [], fallback to text search
+      if (semanticResults !== null && semanticResults.length > 0) {
         if (!semanticResults.includes(c.id)) return false;
       } else if (searchQuery) {
         // Fallback to text search
@@ -82,13 +84,24 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   return (
     <div className="list-view">
       <div className="filters">
-        <input
-          type="text"
-          placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
-          value={searchQuery}
-          onChange={e => onSearchChange(e.target.value)}
-          className="search-input"
-        />
+        <div className="search-wrapper">
+          <input
+            type="text"
+            placeholder="🔍 Hľadať (sémantické vyhľadávanie - voda, inovácie, energia...)"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            className="search-input"
+          />
+          {searchQuery && (
+            <button
+              className="search-clear"
+              onClick={() => { onSearchChange(''); setSemanticResults(null); setQueryIntent(null); }}
+              aria-label="Vymazať vyhľadávanie"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}>
           <option value="">Všetky zdroje</option>
           {sources.map(s => <option key={s} value={s}>{s}</option>)}
@@ -104,7 +117,8 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
         </select>
         <span className="result-count">
           {isSearching ? '🔍 Hľadám...' : `${filtered.length} z ${calls.length}`}
-          {semanticResults !== null && ' (sémantické)'}
+          {semanticResults !== null && semanticResults.length > 0 && ' (sémantické)'}
+          {semanticResults !== null && semanticResults.length === 0 && searchQuery.length >= 2 && ' (textové)'}
         </span>
       </div>
 
