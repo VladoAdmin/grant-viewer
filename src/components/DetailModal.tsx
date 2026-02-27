@@ -62,10 +62,9 @@ export function DetailModal({ callId, onClose }: Props) {
             <div style={{ display: 'flex', gap: 8, margin: '10px 0 18px' }}>
               <button
                 style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #3b82f6", background: "#2563eb", color: "white", cursor: "pointer" }}
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    const { doc, filename } = generateCallMonitoringPdf(call, attrs);
-                    doc.save(filename);
+                    await generateCallMonitoringPdf(call, attrs);
                   } catch (e) {
                     console.error('PDF generation failed', e);
                     alert('Nepodarilo sa vygenerovať PDF.');
