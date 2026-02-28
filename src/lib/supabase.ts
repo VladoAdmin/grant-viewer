@@ -43,7 +43,7 @@ export async function fetchCalls(): Promise<GrantCall[]> {
   const { data, error } = await supabase
     .from('grant_calls_v2')
     .select('*')
-    .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná'])
+    .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
     .order('announced_at', { ascending: false, nullsFirst: false });
   
   if (error) throw error;
