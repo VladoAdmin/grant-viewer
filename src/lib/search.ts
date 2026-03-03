@@ -235,41 +235,45 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
     }
   }
 
-  // 2. If intent detected specific filters, refine results via attributes
+  // 2. If intent detected specific filters, try to refine results via grant_calls_v2 detailed search
+  // NOTE: grant_call_attributes table doesn't exist - fallback to searching in grant_calls_v2 call_details
   const hasFilters = intent.applicantTerms.length > 0
     || intent.locationTerms.length > 0
     || intent.sectorTerms.length > 0;
 
   if (hasFilters && vectorResults.length > 0) {
     try {
-      // Fetch attributes for vector results to filter
-      const { data: attrs } = await supabase
-        .from('grant_call_attributes')
-        .select('grant_call_id, key, value')
-        .in('grant_call_id', vectorResults.slice(0, 60));
+      // Fetch details from grant_calls_v2 (which includes call_details JSON)
+      const { data: callsData, error: callsError } = await supabase
+        .from('grant_calls_v2')
+        .select('id, title, call_details')
+        .in('id', vectorResults.slice(0, 60));
 
-      if (attrs && attrs.length > 0) {
-        const callAttrs = new Map<string, Array<{key: string; value: string}>>();
-        for (const a of attrs) {
-          const list = callAttrs.get(a.grant_call_id) || [];
-          list.push({ key: a.key, value: a.value });
-          callAttrs.set(a.grant_call_id, list);
-        }
+      if (callsError) {
+        console.warn('Could not fetch call details for filtering:', callsError);
+        // Continue with vector results unchanged
+        return vectorResults.slice(0, limit);
+      }
 
-        // Score each call based on attribute match
+      if (callsData && callsData.length > 0) {
+        // Score each call based on detailed content match
         const scored = vectorResults.map((callId, idx) => {
           let score = vectorResults.length - idx; // base score from vector rank
-          const ca = callAttrs.get(callId) || [];
+          const call = callsData.find(c => c.id === callId);
+          
+          if (!call) return { callId, score };
 
-          // Boost for applicant match
+          // Combine all searchable text from call
+          const searchText = normalize([
+            call.title,
+            typeof call.call_details === 'string' ? call.call_details : JSON.stringify(call.call_details)
+          ].join(' '));
+
+          // Boost for applicant match in details
           if (intent.applicantTerms.length > 0) {
-            const applicantValues = ca
-              .filter(a => a.key.toLowerCase().includes('opravnen') || a.key.toLowerCase().includes('žiadatel'))
-              .map(a => normalize(a.value))
-              .join(' ');
             for (const term of intent.applicantTerms) {
               const keywords = APPLICANT_KEYWORDS[term] || [term];
-              if (keywords.some(kw => applicantValues.includes(normalize(kw)))) {
+              if (keywords.some(kw => searchText.includes(normalize(kw)))) {
                 score += 50;
               }
             }
@@ -277,23 +281,18 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
 
           // Boost for location match
           if (intent.locationTerms.length > 0) {
-            const locValues = ca
-              .filter(a => a.key.toLowerCase().includes('miesto') || a.key.toLowerCase().includes('územie'))
-              .map(a => normalize(a.value))
-              .join(' ');
             for (const loc of intent.locationTerms) {
-              if (locValues.includes(normalize(loc))) {
+              if (searchText.includes(normalize(loc))) {
                 score += 30;
               }
             }
           }
 
-          // Boost for sector match (in title/attrs)
+          // Boost for sector match
           if (intent.sectorTerms.length > 0) {
-            const allText = ca.map(a => normalize(a.value)).join(' ');
             for (const sector of intent.sectorTerms) {
               const keywords = SECTOR_KEYWORDS[sector] || [sector];
-              if (keywords.some(kw => allText.includes(normalize(kw)))) {
+              if (keywords.some(kw => searchText.includes(normalize(kw)))) {
                 score += 20;
               }
             }
@@ -303,10 +302,11 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
         });
 
         scored.sort((a, b) => b.score - a.score);
+        console.log('[semanticSearch] Boosted results with intent filters:', intent);
         return scored.slice(0, limit).map(s => s.callId);
       }
     } catch (e) {
-      console.error('Attribute filtering failed:', e);
+      console.error('Detailed filtering failed, returning vector results:', e);
     }
   }
 
