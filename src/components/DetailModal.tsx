@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
-  fetchCalls, fetchAttributes, fetchAttachments,
+  fetchCallById, fetchAttributes, fetchAttachments,
   GrantCall, GrantAttribute, GrantAttachment
 } from '../lib/supabase';
 import { generateCallMonitoringPdf } from '../lib/reportPdf';
 
 interface Props {
-  callId: string;
+  callId: string | number;
   onClose: () => void;
 }
 
@@ -18,10 +18,11 @@ export function DetailModal({ callId, onClose }: Props) {
 
   useEffect(() => {
     setLoading(true);
+    // Fetch call directly by ID; attributes and attachments are non-fatal
     Promise.all([
-      fetchCalls().then(cs => cs.find(c => c.id === callId) || null),
-      fetchAttributes(callId),
-      fetchAttachments(callId),
+      fetchCallById(callId),
+      fetchAttributes(callId).catch(() => [] as GrantAttribute[]),
+      fetchAttachments(callId).catch(() => [] as GrantAttachment[]),
     ])
       .then(([c, a, att]) => {
         setCall(c);
@@ -33,9 +34,11 @@ export function DetailModal({ callId, onClose }: Props) {
   }, [callId]);
 
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('sk-SK') : '—';
-  const formatAmount = (n: number | null) => {
+  const formatAmount = (n: string | number | null) => {
     if (!n) return '—';
-    return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+    const num = typeof n === 'string' ? parseFloat(n) : n;
+    if (isNaN(num)) return String(n);
+    return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
   };
 
   // Key attributes to show prominently
@@ -97,11 +100,11 @@ export function DetailModal({ callId, onClose }: Props) {
                 <span>{formatAmount(call.total_allocation)}</span>
               </div>
               <div className="detail-field">
-                <label>Oprávnení žiadatelia</label>
-                <span>{call.eligible_applicants || '—'}</span>
+                <label>Typ výzvy</label>
+                <span>{call.call_type || '—'}</span>
               </div>
               <div className="detail-field">
-                <label>Typ výzvy</label>
+                <label>Stav</label>
                 <span className={`status-badge ${(call.status || '').toLowerCase().includes('otvoren') ? 'open' : ''}`}>
                   {call.status || '—'}
                 </span>

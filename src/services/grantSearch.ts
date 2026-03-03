@@ -15,7 +15,7 @@ export interface GrantResult {
   call_id: string;
   title: string;
   deadline_at: string | null;
-  total_allocation: number | null;
+  total_allocation: string | number | null;
   provider: string | null;
   call_url: string | null;
   similarity: number;

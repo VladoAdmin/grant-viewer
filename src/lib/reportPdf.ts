@@ -88,8 +88,7 @@ function buildSections(call: GrantCall, attrs: GrantAttribute[]): Section[] {
   add('SPOLUÚČASŤ', pickAttr(attrs, ['Miera spolufinancovania', 'Spoluúčasť']));
 
   // OPRÁVNENÝ ŽIADATEĽ
-  add('OPRÁVNENÝ ŽIADATEĽ', call.eligible_applicants
-    || pickAttr(attrs, ['opravneni_ziadatelia', 'Oprávnení žiadatelia', 'Cieľová skupina 1']));
+  add('OPRÁVNENÝ ŽIADATEĽ', pickAttr(attrs, ['opravneni_ziadatelia', 'Oprávnení žiadatelia', 'Cieľová skupina 1']));
 
   // OPRÁVNENÉ AKTIVITY
   add('OPRÁVNENÉ AKTIVITY', pickAttr(attrs, ['Oprávnené aktivity']));

@@ -6,7 +6,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.V
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export interface GrantCall {
-  id: string;
+  id: string | number;
   source: string;
   source_url: string;
   call_url: string;
@@ -15,9 +15,9 @@ export interface GrantCall {
   deadline_at: string | null;
   provider: string | null;
   call_type: string | null;
-  total_allocation: number | null;
-  eligible_applicants: string | null;
+  total_allocation: string | null;
   status: string | null;
+  closed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,20 +61,41 @@ export async function fetchAllCalls(): Promise<GrantCall[]> {
   return data || [];
 }
 
-export async function fetchAttributes(callId: string): Promise<GrantAttribute[]> {
+export async function fetchCallById(callId: string | number): Promise<GrantCall | null> {
+  const { data, error } = await supabase
+    .from('grant_calls_v2')
+    .select('*')
+    .eq('id', callId)
+    .maybeSingle();
+  if (error) {
+    console.error('[fetchCallById] Error:', error.message);
+    return null;
+  }
+  return data;
+}
+
+export async function fetchAttributes(callId: string | number): Promise<GrantAttribute[]> {
+  // Try grant_call_attributes first; table may not exist in some deployments
   const { data, error } = await supabase
     .from('grant_call_attributes')
     .select('*')
     .eq('grant_call_id', callId);
-  if (error) throw error;
+  if (error) {
+    // Table doesn't exist (PGRST205) or other error — return empty gracefully
+    console.warn('[fetchAttributes] Attributes not available:', error.message);
+    return [];
+  }
   return data || [];
 }
 
-export async function fetchAttachments(callId: string): Promise<GrantAttachment[]> {
+export async function fetchAttachments(callId: string | number): Promise<GrantAttachment[]> {
   const { data, error } = await supabase
     .from('grant_call_attachments')
     .select('*')
     .eq('grant_call_id', callId);
-  if (error) throw error;
+  if (error) {
+    console.warn('[fetchAttachments] Error fetching attachments:', error.message);
+    return [];
+  }
   return data || [];
 }

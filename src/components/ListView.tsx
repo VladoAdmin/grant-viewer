@@ -55,18 +55,18 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
 
   const filtered = useMemo(() => {
     // Check if semantic results actually intersect with loaded calls
-    const loadedIds = new Set(calls.map(c => c.id));
+    const loadedIds = new Set(calls.map(c => String(c.id)));
     const hasUsableSemanticResults = semanticResults !== null
       && semanticResults.length > 0
-      && semanticResults.some(id => loadedIds.has(id));
+      && semanticResults.some(id => loadedIds.has(String(id)));
 
     return calls.filter(c => {
       // Use semantic results only if they match loaded calls
       if (hasUsableSemanticResults) {
-        if (!semanticResults!.includes(c.id)) return false;
+        if (!semanticResults!.includes(String(c.id))) return false;
       } else if (activeQuery) {
         // Fallback to text search (includes when semantic returned no matching IDs)
-        if (!matchesQuery([c.title, c.source, c.provider, c.eligible_applicants], activeQuery)) return false;
+        if (!matchesQuery([c.title, c.source, c.provider, c.call_type], activeQuery)) return false;
       }
 
       if (sourceFilter && c.source !== sourceFilter) return false;
@@ -78,7 +78,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
   // Notify parent about currently displayed grants (for chatbot category analysis)
   useEffect(() => {
     if (!onResultsChange) return;
-    onResultsChange(filtered.map(g => g.id));
+    onResultsChange(filtered.map(g => String(g.id)));
   }, [filtered, onResultsChange]);
 
   const formatDate = (d: string | null) => {
@@ -86,9 +86,11 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
     return new Date(d).toLocaleDateString('sk-SK');
   };
 
-  const formatAmount = (n: number | null) => {
+  const formatAmount = (n: string | number | null) => {
     if (!n) return '—';
-    return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+    const num = typeof n === 'string' ? parseFloat(n) : n;
+    if (isNaN(num)) return String(n);
+    return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
   };
 
   return (
@@ -178,7 +180,7 @@ export function ListView({ calls, onSelect, searchQuery, onSearchChange, onResul
           </thead>
           <tbody>
             {filtered.map(call => (
-              <tr key={call.id} onClick={() => onSelect(call.id)} className="clickable">
+              <tr key={String(call.id)} onClick={() => onSelect(String(call.id))} className="clickable">
                 <td className="title-cell">{call.title}</td>
                 <td className="source-cell">{call.source}</td>
                 <td>{call.provider || '—'}</td>
