@@ -201,17 +201,70 @@ async function getQueryEmbedding(query: string): Promise<number[] | null> {
 }
 
 /**
+ * Text-based fallback search using ilike on grant_calls_v2 title and call_details.
+ * Used when vector search (match_call_chunks RPC) is unavailable.
+ */
+async function textFallbackSearch(query: string, limit: number): Promise<string[]> {
+  const terms = normalize(query).split(/\s+/).filter(t => t.length >= 2);
+  if (terms.length === 0) return [];
+
+  try {
+    // Search by title using ilike with wildcards for each term
+    // Supabase doesn't support multiple ilike easily, so we use .or() with patterns
+    const patterns = terms.map(t => `title.ilike.%${t}%`).join(',');
+    
+    const { data, error } = await supabase
+      .from('grant_calls_v2')
+      .select('id, title, call_details')
+      .or(patterns)
+      .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
+      .order('announced_at', { ascending: false, nullsFirst: false })
+      .limit(limit * 3);
+
+    if (error) {
+      console.error('[textFallbackSearch] Error:', error.message);
+      return [];
+    }
+
+    if (!data || data.length === 0) return [];
+
+    // Score results by how many terms match in title + call_details
+    const scored = data.map(row => {
+      const searchText = normalize([
+        row.title || '',
+        typeof row.call_details === 'string' ? row.call_details : JSON.stringify(row.call_details || '')
+      ].join(' '));
+
+      const matchCount = terms.filter(t => searchText.includes(t)).length;
+      return { id: String(row.id), score: matchCount };
+    });
+
+    // Sort by match count descending, filter out zero matches
+    scored.sort((a, b) => b.score - a.score);
+    return scored
+      .filter(s => s.score > 0)
+      .slice(0, limit)
+      .map(s => s.id);
+  } catch (e) {
+    console.error('[textFallbackSearch] Exception:', e);
+    return [];
+  }
+}
+
+/**
  * Semantic search using pgvector + intent-based attribute filtering
  * Returns call IDs ordered by relevance
+ * Falls back to text search if vector search (match_call_chunks) is unavailable
  */
 export async function semanticSearchCalls(query: string, limit: number = 20): Promise<string[]> {
   query = sanitizeQuery(query);
   if (!query || isRateLimited()) return [];
   const intent = classifyQuery(query);
 
-  // 1. Vector search via embeddings
+  // 1. Vector search via embeddings (with fallback to text search)
   const embedding = await getQueryEmbedding(query);
   let vectorResults: string[] = [];
+  let usedFallback = false;
 
   if (embedding) {
     try {
@@ -221,7 +274,12 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
         match_count: limit * 3
       });
 
-      if (!error && data) {
+      if (error) {
+        // RPC not available (404) or other error — fall back to text search
+        console.warn('[semanticSearch] RPC match_call_chunks unavailable, falling back to text search:', error.message);
+        vectorResults = await textFallbackSearch(query, limit);
+        usedFallback = true;
+      } else if (data) {
         const seen = new Set<string>();
         for (const row of data) {
           if (!seen.has(row.call_id)) {
@@ -231,8 +289,20 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
         }
       }
     } catch (e) {
-      console.error('Semantic search failed:', e);
+      console.error('Semantic search failed, falling back to text search:', e);
+      vectorResults = await textFallbackSearch(query, limit);
+      usedFallback = true;
     }
+  } else {
+    // No embedding available (no API key or error) — use text fallback
+    console.warn('[semanticSearch] No embedding available, using text fallback');
+    vectorResults = await textFallbackSearch(query, limit);
+    usedFallback = true;
+  }
+
+  // If fallback was used, skip the intent-based re-ranking (already text-filtered)
+  if (usedFallback) {
+    return vectorResults.slice(0, limit);
   }
 
   // 2. If intent detected specific filters, try to refine results via grant_calls_v2 detailed search

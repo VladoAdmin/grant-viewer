@@ -85,70 +85,130 @@ export async function searchGrants(
   const query = buildSearchQuery(context);
   if (!query) return [];
 
-  // 1. Embedding
-  const embedding = await getEmbedding(query);
+  let useVectorSearch = true;
+  let chunks: Array<{ call_id: string; similarity: number }> = [];
 
-  // 2. Vector search via RPC
-  const { data: chunks, error } = await supabase.rpc('match_call_chunks', {
-    query_embedding: embedding,
-    match_threshold: 0.5,
-    match_count: 20,
-  });
+  // 1. Try embedding + vector search
+  try {
+    const embedding = await getEmbedding(query);
 
-  if (error) {
-    console.error('[grantSearch] RPC error:', error);
-    throw error;
+    const { data, error } = await supabase.rpc('match_call_chunks', {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: 20,
+    });
+
+    if (error) {
+      console.warn('[grantSearch] RPC match_call_chunks unavailable, falling back to text search:', error.message);
+      useVectorSearch = false;
+    } else {
+      chunks = data || [];
+    }
+  } catch (e) {
+    console.warn('[grantSearch] Vector search failed, falling back to text search:', e);
+    useVectorSearch = false;
   }
 
-  if (!chunks?.length) return [];
+  // 2a. Vector path: deduplicate and fetch metadata
+  if (useVectorSearch && chunks.length > 0) {
+    const bestByCall = new Map<string, { call_id: string; similarity: number }>();
+    for (const chunk of chunks) {
+      const existing = bestByCall.get(chunk.call_id);
+      if (!existing || chunk.similarity > existing.similarity) {
+        bestByCall.set(chunk.call_id, {
+          call_id: chunk.call_id,
+          similarity: chunk.similarity,
+        });
+      }
+    }
 
-  // 3. Deduplicate by call_id, keep best similarity
-  const bestByCall = new Map<string, { call_id: string; similarity: number }>();
-  for (const chunk of chunks) {
-    const existing = bestByCall.get(chunk.call_id);
-    if (!existing || chunk.similarity > existing.similarity) {
-      bestByCall.set(chunk.call_id, {
-        call_id: chunk.call_id,
-        similarity: chunk.similarity,
+    const callIds = [...bestByCall.keys()];
+    const { data: grants, error: grantError } = await supabase
+      .from('grant_calls_v2')
+      .select('id, title, deadline_at, total_allocation, provider, call_url')
+      .in('id', callIds);
+
+    if (grantError) {
+      console.error('[grantSearch] grant fetch error:', grantError);
+      throw grantError;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const results: GrantResult[] = [];
+
+    for (const grant of grants || []) {
+      if (grant.deadline_at && grant.deadline_at < today) continue;
+      const match = bestByCall.get(grant.id);
+      if (!match) continue;
+
+      results.push({
+        call_id: grant.id,
+        title: grant.title,
+        deadline_at: grant.deadline_at,
+        total_allocation: grant.total_allocation,
+        provider: grant.provider,
+        call_url: grant.call_url,
+        similarity: match.similarity,
       });
     }
+
+    results.sort((a, b) => b.similarity - a.similarity);
+    return results.slice(0, maxResults);
   }
 
-  // 4. Fetch grant metadata for matched call_ids
-  const callIds = [...bestByCall.keys()];
-  const { data: grants, error: grantError } = await supabase
-    .from('grant_calls_v2')
-    .select('id, title, deadline_at, total_allocation, provider, call_url')
-    .in('id', callIds);
+  // 2b. Fallback: text-based ilike search on title
+  if (!useVectorSearch || chunks.length === 0) {
+    const terms = query
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(t => t.length >= 2);
 
-  if (grantError) {
-    console.error('[grantSearch] grant fetch error:', grantError);
-    throw grantError;
+    if (terms.length === 0) return [];
+
+    const patterns = terms.map(t => `title.ilike.%${t}%`).join(',');
+
+    const { data: grants, error: grantError } = await supabase
+      .from('grant_calls_v2')
+      .select('id, title, deadline_at, total_allocation, provider, call_url')
+      .or(patterns)
+      .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
+      .order('announced_at', { ascending: false, nullsFirst: false })
+      .limit(maxResults * 3);
+
+    if (grantError) {
+      console.error('[grantSearch] text fallback error:', grantError);
+      return [];
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const results: GrantResult[] = [];
+
+    for (const grant of grants || []) {
+      if (grant.deadline_at && grant.deadline_at < today) continue;
+
+      // Score by counting matching terms in title
+      const titleNorm = grant.title
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+      const matchCount = terms.filter(t => titleNorm.includes(t)).length;
+
+      results.push({
+        call_id: grant.id,
+        title: grant.title,
+        deadline_at: grant.deadline_at,
+        total_allocation: grant.total_allocation,
+        provider: grant.provider,
+        call_url: grant.call_url,
+        similarity: matchCount / terms.length, // normalized 0-1
+      });
+    }
+
+    results.sort((a, b) => b.similarity - a.similarity);
+    return results.filter(r => r.similarity > 0).slice(0, maxResults);
   }
 
-  // 5. Post-filter: exclude expired grants
-  const today = new Date().toISOString().slice(0, 10);
-  const results: GrantResult[] = [];
-
-  for (const grant of grants || []) {
-    // Skip grants past deadline
-    if (grant.deadline_at && grant.deadline_at < today) continue;
-
-    const match = bestByCall.get(grant.id);
-    if (!match) continue;
-
-    results.push({
-      call_id: grant.id,
-      title: grant.title,
-      deadline_at: grant.deadline_at,
-      total_allocation: grant.total_allocation,
-      provider: grant.provider,
-      call_url: grant.call_url,
-      similarity: match.similarity,
-    });
-  }
-
-  // 6. Sort by similarity desc, return top N
-  results.sort((a, b) => b.similarity - a.similarity);
-  return results.slice(0, maxResults);
+  return [];
 }
