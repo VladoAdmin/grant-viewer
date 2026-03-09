@@ -10,6 +10,40 @@ interface Props {
   onClose: () => void;
 }
 
+/* ── helpers to look up attribute values by key ── */
+function attrVal(attrs: GrantAttribute[], ...keys: string[]): string | null {
+  for (const k of keys) {
+    const found = attrs.find(a =>
+      a.key === k || a.key.toLowerCase() === k.toLowerCase()
+    );
+    if (found?.value) return found.value;
+  }
+  return null;
+}
+
+function attrValIncludes(attrs: GrantAttribute[], substr: string): string | null {
+  const found = attrs.find(a => a.key.toLowerCase().includes(substr.toLowerCase()));
+  return found?.value || null;
+}
+
+/* keys that are rendered in the structured sections below (skip in "other") */
+const STRUCTURED_KEYS = new Set([
+  'program', 'kód výzvy', 'kod_vyzvy', 'druh výzvy', 'typ výzvy',
+  'alokácia eú', 'alokácia šr', 'alokácia spolu', 'alokacia_eu',
+  'celkova_alokacia', 'miesto realizácie', 'špecifický cieľ',
+  'specificke_ciele', 'vyhlasovateľ výzvy', 'poskytovatel',
+  'opravneni_ziadatelia', 'opravnene_aktivity', 'nazov_programu',
+  'datum_vyhlasenia', 'deadline',
+]);
+
+function isStructuredKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  if (STRUCTURED_KEYS.has(lower)) return true;
+  if (lower.includes('žiadatel') || lower.includes('ziadatel')) return true;
+  if (lower.includes('oprávnen') || lower.includes('opravnen')) return true;
+  return false;
+}
+
 export function DetailModal({ callId, onClose }: Props) {
   const [call, setCall] = useState<GrantCall | null>(null);
   const [attrs, setAttrs] = useState<GrantAttribute[]>([]);
@@ -18,7 +52,6 @@ export function DetailModal({ callId, onClose }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    // Fetch call directly by ID; attributes and attachments are non-fatal
     Promise.all([
       fetchCallById(callId),
       fetchAttributes(callId).catch(() => [] as GrantAttribute[]),
@@ -41,13 +74,30 @@ export function DetailModal({ callId, onClose }: Props) {
     return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
   };
 
-  // Key attributes to show prominently
-  const keyAttrs = ['Program', 'Kód', 'Miesto realizácie', 'Oprávnení žiadatelia',
-    'Celková alokácia', 'Podpora pre projekt', 'Typ výzvy', 'Druh výzvy',
-    'Poskytovateľ', 'Vyhlasovateľ výzvy'];
+  /* ── structured attribute values ── */
+  const program = attrVal(attrs, 'Program', 'nazov_programu');
+  const kodVyzvy = attrVal(attrs, 'Kód výzvy', 'kod_vyzvy');
+  const druhVyzvy = attrVal(attrs, 'Druh výzvy');
+  const typVyzvy = attrVal(attrs, 'Typ výzvy');
+  const vyhlasovatel = attrVal(attrs, 'Vyhlasovateľ výzvy', 'poskytovatel');
 
-  const importantAttrs = attrs.filter(a => keyAttrs.some(k => a.key.includes(k)));
-  const _otherAttrs = attrs.filter(a => !keyAttrs.some(k => a.key.includes(k)));
+  const alokaciaEU = attrVal(attrs, 'Alokácia EÚ', 'alokacia_eu');
+  const alokaciaSR = attrVal(attrs, 'Alokácia ŠR');
+  const alokaciaSpolu = attrVal(attrs, 'Alokácia spolu', 'celkova_alokacia');
+
+  const miestoRealizacie = attrVal(attrs, 'Miesto realizácie');
+  const specificCiel = attrVal(attrs, 'Špecifický cieľ', 'specificke_ciele');
+  const opravneniZiadatelia = attrVal(attrs, 'Oprávnení žiadatelia', 'opravneni_ziadatelia') ||
+    attrValIncludes(attrs, 'žiadatel') || attrValIncludes(attrs, 'ziadatel');
+  const opravneneAktivity = attrVal(attrs, 'opravnene_aktivity');
+
+  const hasBasicInfo = program || kodVyzvy || druhVyzvy || typVyzvy || vyhlasovatel;
+  const hasFinancing = alokaciaEU || alokaciaSR || alokaciaSpolu;
+  const hasStructured = hasBasicInfo || hasFinancing || miestoRealizacie ||
+    specificCiel || opravneniZiadatelia || opravneneAktivity;
+
+  /* remaining attrs not covered by structured sections */
+  const otherAttrs = attrs.filter(a => !isStructuredKey(a.key));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -78,6 +128,7 @@ export function DetailModal({ callId, onClose }: Props) {
               </button>
             </div>
 
+            {/* ── Core fields grid (unchanged) ── */}
             <div className="detail-grid">
               <div className="detail-field">
                 <label>Zdroj</label>
@@ -117,11 +168,101 @@ export function DetailModal({ callId, onClose }: Props) {
               </div>
             </div>
 
-            {importantAttrs.length > 0 && (
+            {/* ── Structured ITMS21 attribute sections ── */}
+            {hasStructured && (
+              <>
+                {hasBasicInfo && (
+                  <div className="detail-section">
+                    <h3>📋 Základné informácie</h3>
+                    <div className="attrs-list">
+                      {program && (
+                        <div className="attr-row"><span className="attr-key">Program</span><span className="attr-value">{program}</span></div>
+                      )}
+                      {kodVyzvy && (
+                        <div className="attr-row"><span className="attr-key">Kód výzvy</span><span className="attr-value">{kodVyzvy}</span></div>
+                      )}
+                      {druhVyzvy && (
+                        <div className="attr-row"><span className="attr-key">Druh výzvy</span><span className="attr-value">{druhVyzvy}</span></div>
+                      )}
+                      {typVyzvy && (
+                        <div className="attr-row"><span className="attr-key">Typ výzvy</span><span className="attr-value">{typVyzvy}</span></div>
+                      )}
+                      {vyhlasovatel && (
+                        <div className="attr-row"><span className="attr-key">Vyhlasovateľ</span><span className="attr-value">{vyhlasovatel}</span></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {hasFinancing && (
+                  <div className="detail-section">
+                    <h3>💰 Financovanie</h3>
+                    <div className="attrs-list">
+                      {alokaciaEU && (
+                        <div className="attr-row"><span className="attr-key">Alokácia EÚ</span><span className="attr-value">{alokaciaEU}</span></div>
+                      )}
+                      {alokaciaSR && (
+                        <div className="attr-row"><span className="attr-key">Alokácia ŠR</span><span className="attr-value">{alokaciaSR}</span></div>
+                      )}
+                      {alokaciaSpolu && (
+                        <div className="attr-row"><span className="attr-key">Alokácia spolu</span><span className="attr-value">{alokaciaSpolu}</span></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {miestoRealizacie && (
+                  <div className="detail-section">
+                    <h3>📍 Miesto realizácie</h3>
+                    <div className="attrs-list">
+                      <div className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
+                        <span className="attr-value">{miestoRealizacie}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {opravneniZiadatelia && (
+                  <div className="detail-section">
+                    <h3>👥 Oprávnení žiadatelia</h3>
+                    <div className="attrs-list">
+                      <div className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
+                        <span className="attr-value">{opravneniZiadatelia}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {specificCiel && (
+                  <div className="detail-section">
+                    <h3>🎯 Špecifický cieľ</h3>
+                    <div className="attrs-list">
+                      <div className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
+                        <span className="attr-value">{specificCiel}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {opravneneAktivity && (
+                  <div className="detail-section">
+                    <h3>✅ Oprávnené aktivity</h3>
+                    <div className="attrs-list">
+                      <div className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
+                        <span className="attr-value">{opravneneAktivity}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Other (non-structured) attributes ── */}
+            {otherAttrs.length > 0 && (
               <div className="detail-section">
                 <h3>Doplňujúce údaje</h3>
                 <div className="attrs-list">
-                  {importantAttrs.map(a => (
+                  {otherAttrs.map(a => (
                     <div key={a.id} className="attr-row">
                       <span className="attr-key">{a.key}</span>
                       <span className="attr-value">{a.value}</span>
