@@ -38,6 +38,8 @@ const STRUCTURED_KEYS = new Set([
 
 function isStructuredKey(key: string): boolean {
   const lower = key.toLowerCase();
+  // Hide vs_ prefixed keys (vector search cached attributes)
+  if (lower.startsWith('vs_')) return true;
   if (STRUCTURED_KEYS.has(lower)) return true;
   if (lower.includes('žiadatel') || lower.includes('ziadatel')) return true;
   if (lower.includes('oprávnen') || lower.includes('opravnen')) return true;
