@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchCalls, fetchAllCalls, GrantCall } from './lib/supabase';
+import { fetchCallsWithChunks, fetchAllCallsWithChunks, GrantCall } from './lib/supabase';
 import { ListView } from './components/ListView';
 import { GanttView } from './components/GanttView';
 import { DetailModal } from './components/DetailModal';
@@ -15,7 +15,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    const loadCalls = showAll ? fetchAllCalls() : fetchCalls();
+    const loadCalls = showAll ? fetchAllCallsWithChunks() : fetchCallsWithChunks();
     loadCalls
       .then(setCalls)
       .catch(console.error)

@@ -671,3 +671,9 @@ td { padding: 8px 12px; vertical-align: top; }
     align-items: flex-start;
   }
 }
+
+/* Loading spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

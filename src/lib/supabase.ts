@@ -61,6 +61,54 @@ export async function fetchAllCalls(): Promise<GrantCall[]> {
   return data || [];
 }
 
+/**
+ * Fetch only calls that have PDF chunks in v2_call_chunks (active only).
+ */
+export async function fetchCallsWithChunks(): Promise<GrantCall[]> {
+  // Get distinct call_ids that have chunks
+  const { data: chunkRows, error: chunkErr } = await supabase
+    .from('v2_call_chunks')
+    .select('call_id');
+  if (chunkErr) throw chunkErr;
+
+  const callIds = [...new Set((chunkRows || []).map(r => r.call_id))];
+  if (callIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('grant_calls_v2')
+    .select('*')
+    .in('id', callIds)
+    .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
+    .is('deleted_at', null)
+    .order('announced_at', { ascending: false, nullsFirst: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Fetch all calls that have PDF chunks (including closed).
+ */
+export async function fetchAllCallsWithChunks(): Promise<GrantCall[]> {
+  const { data: chunkRows, error: chunkErr } = await supabase
+    .from('v2_call_chunks')
+    .select('call_id');
+  if (chunkErr) throw chunkErr;
+
+  const callIds = [...new Set((chunkRows || []).map(r => r.call_id))];
+  if (callIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('grant_calls_v2')
+    .select('*')
+    .in('id', callIds)
+    .is('deleted_at', null)
+    .order('announced_at', { ascending: false, nullsFirst: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 export async function fetchCallById(callId: string | number): Promise<GrantCall | null> {
   const { data, error } = await supabase
     .from('grant_calls_v2')

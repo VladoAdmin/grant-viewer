@@ -44,11 +44,119 @@ function isStructuredKey(key: string): boolean {
   return false;
 }
 
+/* ── Extracted attributes types ── */
+interface ExtractedAttributes {
+  [key: string]: string;
+}
+
+/**
+ * Determine the API base URL for the Express backend.
+ */
+function getApiBaseUrl(): string {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3001';
+  }
+  // Production: use PHP proxy path
+  return '/grant-viewer';
+}
+
+/**
+ * Fetch extracted attributes from vector search + GPT extraction backend.
+ */
+async function fetchExtractedAttributes(callId: string | number): Promise<ExtractedAttributes | null> {
+  try {
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/api/calls/${callId}/extracted-attributes`);
+    if (!response.ok) {
+      console.warn(`[fetchExtractedAttributes] HTTP ${response.status}`);
+      return null;
+    }
+    const data = await response.json();
+    return data as ExtractedAttributes;
+  } catch (err) {
+    console.error('[fetchExtractedAttributes] Error:', err);
+    return null;
+  }
+}
+
+/* ── Section rendering helper for extracted attrs ── */
+interface AttrSection {
+  icon: string;
+  title: string;
+  fields: { label: string; key: string }[];
+  fullWidth?: boolean; // If true, render value as block text
+}
+
+const EXTRACTED_SECTIONS: AttrSection[] = [
+  {
+    icon: '📋',
+    title: 'Základné informácie',
+    fields: [
+      { label: 'Kód výzvy', key: 'Kód výzvy' },
+      { label: 'Program', key: 'Program' },
+      { label: 'Fond', key: 'Fond' },
+      { label: 'Opatrenie', key: 'Opatrenie' },
+    ],
+  },
+  {
+    icon: '🎯',
+    title: 'Špecifický cieľ',
+    fields: [{ label: 'Špecifický cieľ', key: 'Špecifický cieľ' }],
+    fullWidth: true,
+  },
+  {
+    icon: '💰',
+    title: 'Financovanie',
+    fields: [
+      { label: 'Alokácia EÚ', key: 'Alokácia EÚ' },
+      { label: 'Alokácia ŠR', key: 'Alokácia ŠR' },
+      { label: 'Alokácia spolu', key: 'Alokácia spolu' },
+    ],
+  },
+  {
+    icon: '📍',
+    title: 'Miesto realizácie',
+    fields: [{ label: 'Miesto realizácie', key: 'Miesto realizácie' }],
+    fullWidth: true,
+  },
+  {
+    icon: '👥',
+    title: 'Oprávnení žiadatelia',
+    fields: [{ label: 'Oprávnení žiadatelia', key: 'Oprávnení žiadatelia' }],
+    fullWidth: true,
+  },
+  {
+    icon: '✅',
+    title: 'Oprávnené aktivity / výdavky',
+    fields: [
+      { label: 'Oprávnené aktivity', key: 'Oprávnené aktivity' },
+      { label: 'Oprávnené výdavky', key: 'Oprávnené výdavky' },
+    ],
+    fullWidth: true,
+  },
+  {
+    icon: '📅',
+    title: 'Posudzované obdobia',
+    fields: [{ label: 'Posudzované obdobia', key: 'Posudzované obdobia' }],
+    fullWidth: true,
+  },
+  {
+    icon: '📞',
+    title: 'Kontakt',
+    fields: [{ label: 'Kontakt', key: 'Kontakt' }],
+    fullWidth: true,
+  },
+];
+
 export function DetailModal({ callId, onClose }: Props) {
   const [call, setCall] = useState<GrantCall | null>(null);
   const [attrs, setAttrs] = useState<GrantAttribute[]>([]);
   const [attachments, setAttachments] = useState<GrantAttachment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Extracted attributes from vector search
+  const [extractedAttrs, setExtractedAttrs] = useState<ExtractedAttributes | null>(null);
+  const [extractionLoading, setExtractionLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -64,6 +172,12 @@ export function DetailModal({ callId, onClose }: Props) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    // Fetch extracted attributes from backend
+    setExtractionLoading(true);
+    fetchExtractedAttributes(callId)
+      .then(setExtractedAttrs)
+      .finally(() => setExtractionLoading(false));
   }, [callId]);
 
   const formatDate = (d: string | null) => d ? new Date(d).toLocaleDateString('sk-SK') : '—';
@@ -74,7 +188,7 @@ export function DetailModal({ callId, onClose }: Props) {
     return new Intl.NumberFormat('sk-SK', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(num);
   };
 
-  /* ── structured attribute values ── */
+  /* ── structured attribute values (from ITMS attrs table) ── */
   const program = attrVal(attrs, 'Program', 'nazov_programu');
   const kodVyzvy = attrVal(attrs, 'Kód výzvy', 'kod_vyzvy');
   const druhVyzvy = attrVal(attrs, 'Druh výzvy');
@@ -98,6 +212,11 @@ export function DetailModal({ callId, onClose }: Props) {
 
   /* remaining attrs not covered by structured sections */
   const otherAttrs = attrs.filter(a => !isStructuredKey(a.key));
+
+  /* Check if extracted attrs have real data */
+  const hasExtractedData = extractedAttrs && Object.entries(extractedAttrs).some(
+    ([_, v]) => v && v !== '—' && v.trim() !== ''
+  );
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -168,8 +287,66 @@ export function DetailModal({ callId, onClose }: Props) {
               </div>
             </div>
 
-            {/* ── Structured ITMS21 attribute sections ── */}
-            {hasStructured && (
+            {/* ── Vector Search Extracted Attributes ── */}
+            {extractionLoading && (
+              <div className="detail-section" style={{ textAlign: 'center', padding: '20px', color: '#9ca3af' }}>
+                <div className="loading-spinner" style={{
+                  display: 'inline-block',
+                  width: 20,
+                  height: 20,
+                  border: '2px solid #4b5563',
+                  borderTop: '2px solid #3b82f6',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginRight: 10,
+                  verticalAlign: 'middle',
+                }} />
+                Načítavam údaje z dokumentov...
+              </div>
+            )}
+
+            {!extractionLoading && hasExtractedData && (
+              <>
+                {EXTRACTED_SECTIONS.map(section => {
+                  // Filter to fields that have actual values
+                  const validFields = section.fields.filter(f => {
+                    const val = extractedAttrs![f.key];
+                    return val && val !== '—' && val.trim() !== '';
+                  });
+                  if (validFields.length === 0) return null;
+
+                  return (
+                    <div className="detail-section" key={section.title}>
+                      <h3>{section.icon} {section.title}</h3>
+                      <div className="attrs-list">
+                        {validFields.map(f => {
+                          const val = extractedAttrs![f.key];
+                          if (section.fullWidth) {
+                            return (
+                              <div key={f.key} className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
+                                {validFields.length > 1 && (
+                                  <span className="attr-key" style={{ fontWeight: 600, marginBottom: 2 }}>{f.label}</span>
+                                )}
+                                <span className="attr-value" style={{ whiteSpace: 'pre-wrap' }}>{val}</span>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div key={f.key} className="attr-row">
+                              <span className="attr-key">{f.label}</span>
+                              <span className="attr-value">{val}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* ── Structured ITMS21 attribute sections (fallback if no extracted data) ── */}
+            {!hasExtractedData && hasStructured && (
               <>
                 {hasBasicInfo && (
                   <div className="detail-section">
