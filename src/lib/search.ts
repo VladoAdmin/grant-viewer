@@ -201,7 +201,7 @@ async function getQueryEmbedding(query: string): Promise<number[] | null> {
 }
 
 /**
- * Text-based fallback search using ilike on grant_calls_v2 title and call_details.
+ * Text-based fallback search using ilike on grant_calls_v2 title, provider, call_type.
  * Used when vector search (match_call_chunks RPC) is unavailable.
  */
 async function textFallbackSearch(query: string, limit: number): Promise<string[]> {
@@ -209,14 +209,15 @@ async function textFallbackSearch(query: string, limit: number): Promise<string[
   if (terms.length === 0) return [];
 
   try {
-    // Search by title using ilike with wildcards for each term
-    // Supabase doesn't support multiple ilike easily, so we use .or() with patterns
-    const patterns = terms.map(t => `title.ilike.%${t}%`).join(',');
+    // Search by title OR provider OR call_type using ilike with wildcards
+    const titlePatterns = terms.map(t => `title.ilike.%${t}%`).join(',');
+    const providerPatterns = terms.map(t => `provider.ilike.%${t}%`).join(',');
+    const callTypePatterns = terms.map(t => `call_type.ilike.%${t}%`).join(',');
     
     const { data, error } = await supabase
       .from('grant_calls_v2')
-      .select('id, title, call_details')
-      .or(patterns)
+      .select('id, title, provider, call_type')
+      .or([titlePatterns, providerPatterns, callTypePatterns].join(','))
       .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
       .order('announced_at', { ascending: false, nullsFirst: false })
       .limit(limit * 3);
@@ -228,11 +229,12 @@ async function textFallbackSearch(query: string, limit: number): Promise<string[
 
     if (!data || data.length === 0) return [];
 
-    // Score results by how many terms match in title + call_details
+    // Score results by how many terms match
     const scored = data.map(row => {
       const searchText = normalize([
         row.title || '',
-        typeof row.call_details === 'string' ? row.call_details : JSON.stringify(row.call_details || '')
+        row.provider || '',
+        row.call_type || ''
       ].join(' '));
 
       const matchCount = terms.filter(t => searchText.includes(t)).length;
@@ -306,17 +308,17 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
   }
 
   // 2. If intent detected specific filters, try to refine results via grant_calls_v2 detailed search
-  // NOTE: grant_call_attributes table doesn't exist - fallback to searching in grant_calls_v2 call_details
+  // NOTE: grant_call_attributes table doesn't exist - fallback to searching in grant_calls_v2 title/provider/call_type
   const hasFilters = intent.applicantTerms.length > 0
     || intent.locationTerms.length > 0
     || intent.sectorTerms.length > 0;
 
   if (hasFilters && vectorResults.length > 0) {
     try {
-      // Fetch details from grant_calls_v2 (which includes call_details JSON)
+      // Fetch details from grant_calls_v2
       const { data: callsData, error: callsError } = await supabase
         .from('grant_calls_v2')
-        .select('id, title, call_details')
+        .select('id, title, provider, call_type')
         .in('id', vectorResults.slice(0, 60));
 
       if (callsError) {
@@ -336,7 +338,8 @@ export async function semanticSearchCalls(query: string, limit: number = 20): Pr
           // Combine all searchable text from call
           const searchText = normalize([
             call.title,
-            typeof call.call_details === 'string' ? call.call_details : JSON.stringify(call.call_details)
+            call.provider,
+            call.call_type
           ].join(' '));
 
           // Boost for applicant match in details

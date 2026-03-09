@@ -3,12 +3,13 @@ import { fetchCalls, fetchAllCalls, GrantCall } from './lib/supabase';
 import { ListView } from './components/ListView';
 import { GanttView } from './components/GanttView';
 import { DetailModal } from './components/DetailModal';
+import { DeepSearch } from './components/DeepSearch';
 import './App.css';
 
 function App() {
   const [calls, setCalls] = useState<GrantCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'list' | 'gantt'>('list');
+  const [view, setView] = useState<'list' | 'gantt' | 'search'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,22 +46,34 @@ function App() {
           >
             📊 Časová os
           </button>
+          <button
+            className={view === 'search' ? 'active' : ''}
+            onClick={() => setView('search')}
+          >
+            🔍 Kontextové vyhľadávanie
+          </button>
         </nav>
-        <label className="show-all-toggle">
-          <input
-            type="checkbox"
-            checked={showAll}
-            onChange={(e) => {
-              setShowAll(e.target.checked);
-              setLoading(true);
-            }}
-          />
-          Zobraziť aj uzavreté
-        </label>
-        <span className="count">{calls.length} výziev</span>
+        {view !== 'search' && (
+          <>
+            <label className="show-all-toggle">
+              <input
+                type="checkbox"
+                checked={showAll}
+                onChange={(e) => {
+                  setShowAll(e.target.checked);
+                  setLoading(true);
+                }}
+              />
+              Zobraziť aj uzavreté
+            </label>
+            <span className="count">{calls.length} výziev</span>
+          </>
+        )}
       </header>
 
-      {loading ? (
+      {view === 'search' ? (
+        <DeepSearch />
+      ) : loading ? (
         <div className="loading">Načítavam dáta...</div>
       ) : view === 'list' ? (
         <ListView
