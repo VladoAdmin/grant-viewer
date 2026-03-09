@@ -65,20 +65,17 @@ export async function fetchAllCalls(): Promise<GrantCall[]> {
  * Fetch only calls that have PDF chunks in v2_call_chunks (active only).
  */
 export async function fetchCallsWithChunks(): Promise<GrantCall[]> {
-  // Get distinct call_ids that have chunks
-  const { data: chunkRows, error: chunkErr } = await supabase
-    .from('v2_call_chunks')
-    .select('call_id');
-  if (chunkErr) throw chunkErr;
+  // Get distinct call_ids via RPC (avoids Supabase default 1000 row limit)
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('get_chunked_call_ids');
+  if (rpcErr) throw rpcErr;
 
-  const callIds = [...new Set((chunkRows || []).map(r => r.call_id))];
+  const callIds = (rpcData || []).map((r: { call_id: number }) => r.call_id);
   if (callIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from('grant_calls_v2')
     .select('*')
     .in('id', callIds)
-    .in('status', ['Otvorená', 'Vyhlásená', 'Plánovaná', 'otvorená', 'vyhlásená', 'plánovaná'])
     .is('deleted_at', null)
     .order('announced_at', { ascending: false, nullsFirst: false });
 
@@ -90,12 +87,10 @@ export async function fetchCallsWithChunks(): Promise<GrantCall[]> {
  * Fetch all calls that have PDF chunks (including closed).
  */
 export async function fetchAllCallsWithChunks(): Promise<GrantCall[]> {
-  const { data: chunkRows, error: chunkErr } = await supabase
-    .from('v2_call_chunks')
-    .select('call_id');
-  if (chunkErr) throw chunkErr;
+  const { data: rpcData, error: rpcErr } = await supabase.rpc('get_chunked_call_ids');
+  if (rpcErr) throw rpcErr;
 
-  const callIds = [...new Set((chunkRows || []).map(r => r.call_id))];
+  const callIds = (rpcData || []).map((r: { call_id: number }) => r.call_id);
   if (callIds.length === 0) return [];
 
   const { data, error } = await supabase

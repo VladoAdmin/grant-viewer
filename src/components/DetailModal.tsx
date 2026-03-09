@@ -323,13 +323,32 @@ export function DetailModal({ callId, onClose }: Props) {
                       <div className="attrs-list">
                         {validFields.map(f => {
                           const val = extractedAttrs![f.key];
+                          // Try to parse JSON objects (e.g. Kontakt) into key-value display
+                          let displayVal: React.ReactNode = val;
+                          if (val && val.startsWith('{')) {
+                            try {
+                              const parsed = JSON.parse(val);
+                              if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+                                displayVal = (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {Object.entries(parsed).map(([k, v]) => (
+                                      <div key={k} style={{ display: 'flex', gap: 8 }}>
+                                        <span style={{ color: '#9ca3af', minWidth: 120, flexShrink: 0 }}>{k}:</span>
+                                        <span>{String(v)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                            } catch { /* not JSON, show as-is */ }
+                          }
                           if (section.fullWidth) {
                             return (
                               <div key={f.key} className="attr-row" style={{ flexDirection: 'column', gap: 4 }}>
                                 {validFields.length > 1 && (
                                   <span className="attr-key" style={{ fontWeight: 600, marginBottom: 2 }}>{f.label}</span>
                                 )}
-                                <span className="attr-value" style={{ whiteSpace: 'pre-wrap' }}>{val}</span>
+                                <span className="attr-value" style={{ whiteSpace: 'pre-wrap' }}>{displayVal}</span>
                               </div>
                             );
                           }
@@ -436,20 +455,7 @@ export function DetailModal({ callId, onClose }: Props) {
               </>
             )}
 
-            {/* ── Other (non-structured) attributes ── */}
-            {otherAttrs.length > 0 && (
-              <div className="detail-section">
-                <h3>Doplňujúce údaje</h3>
-                <div className="attrs-list">
-                  {otherAttrs.map(a => (
-                    <div key={a.id} className="attr-row">
-                      <span className="attr-key">{a.key}</span>
-                      <span className="attr-value">{a.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Doplňujúce údaje hidden — all data shown from vector search extraction above */}
 
             {attachments.length > 0 && (
               <div className="detail-section">
